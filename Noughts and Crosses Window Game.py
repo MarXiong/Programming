@@ -11,7 +11,7 @@ from math import log, sqrt, factorial
 
 
 class Button(object):
-  def __init__(self, rect, command = None, position = None, text = None, hover_text = None, clicked_text = None, disabled = False, **kwargs):
+  def __init__(self, rect, command = None, position = None, text = None, fontsize=None ,hover_text = None, clicked_text = None, disabled = False, **kwargs):
     self.rect = pg.Rect(rect)
     self.command = command
     self.disabled = disabled
@@ -20,8 +20,9 @@ class Button(object):
     self.parse_text(text,hover_text,clicked_text)
     self.process_kwargs(kwargs)
     self.position = position
+    self.fontsize = fontsize
     if self.text != " ":
-      self.resizefont()
+      self.resizefont(self.fontsize)
     self.render_text()
 
   def resizefont(self, size=None):
@@ -544,13 +545,18 @@ def CreateButtonsFunc(boardsize):
   btn_width = btn_height
   for row in range(0, boardsize):
     for col in range(0, boardsize):
-      top = btn_height * row
-      left = btn_width * col
-      b = Button(rect = (left, top, btn_width, btn_height), text = "X", command = lambda l = (row,col): board.makenextplay(l), position = (row,col), **buttonsettings)
-      btns.append(b)
+        top = btn_height * row
+        left = btn_width * col
+        if row+col == 0:
+            b = Button(rect = (left, top, btn_width, btn_height), text = "X", command = lambda l = (row,col): board.makenextplay(l), position = (row,col), **buttonsettings)
+            btns.append(b)
+            fontsize = b.fontsize
+        else:
+            b = Button(rect=(left, top, btn_width, btn_height), text="X", fontsize = fontsize,
+                     command=lambda l=(row, col): board.makenextplay(l), position=(row, col), **buttonsettings)
+            btns.append(b)
   b = Button(rect = (screensize[0] * 61/80-80, screensize[1]-130, 300, 100), command = ResetBoardFunc, text = "Restart",
         **buttonsettings)
-
   btns.append(b)
 
 def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, GameVariablesDict):
@@ -566,10 +572,6 @@ def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, GameVariablesDic
   increment = int(availablerect[3]/totalsliders)
 
   for key in GameVariablesDict.keys():
-    print("Label y",labelposition[1]+slidernumber*increment+10)
-    print("Slider y",np.add(ylimit,slidernumber*increment+10))
-    print("Difference",np.add(ylimit,slidernumber*increment+10)[0]-(labelposition[1]+slidernumber*increment+10))
-    print("Increment",increment)
     s = Slider(rect = (labelposition[0],labelposition[1]+slidernumber*increment+10)+labelsize, sliderrectsize = sliderrectsize, startingvalue = GameVariablesDict[key]["value"],
           command = GameVariablesDict[key]["function"], text = key, xlimit = xlimit, ylimit = np.add(ylimit,slidernumber*increment+10),
           valuerange = GameVariablesDict[key]["range"], **slidersettings)
@@ -579,12 +581,18 @@ def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, GameVariablesDic
 def CreateDisplayWindowsFunc(sliders):
   global wndws, screensize
   wndws = {}
+  firstsliderbool=True
   for key in sliders.keys():
     rect = sliders[key].rect
     rectposition = rect.topleft
     windowrect = (rectposition[0]+rect.size[0]+30, rectposition[1], 40, rect.size[1])
-    window = Button(windowrect,text = str(sliders[key].startingvalue),disabled = True,**buttonsettings)
-    wndws[key] = window
+    if firstsliderbool:
+        window = Button(windowrect, text = str(sliders[key].startingvalue), disabled = True, **buttonsettings)
+        wndws[key] = window
+        fontsize = window.fontsize
+    else:
+        window = Button(windowrect, text=str(sliders[key].startingvalue), fontsize=fontsize, disabled=True, **buttonsettings)
+        wndws[key] = window
 
   currentturnrect = (screensize[1],0,screensize[0]-screensize[1],150)
   wndws["Current Turn"] = Button(currentturnrect, text = "Player 1's turn", disabled = True, **buttonsettings)
@@ -680,7 +688,6 @@ if __name__  ==  '__main__':
         sys.exit(0)
       if event.type  ==  pg.VIDEORESIZE and screensize != event.size:
         factor = np.subtract(np.divide(event.size,screensize),1)
-        print("factor",factor)
         screensize = event.size
         for btn in btns:
           btn.rect = btn.rect.inflate(btn.rect.size*factor)
