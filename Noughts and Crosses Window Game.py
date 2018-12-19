@@ -11,19 +11,15 @@ from math import log, sqrt, factorial
 
 
 class Button(object):
-  def __init__(self, rect, command = None, position = None, text = None, fontsize=None ,hover_text = None, clicked_text = None, disabled = False, **kwargs):
+  def __init__(self, rect, command = None, position = None, text = None, fontsize = None, hover_text = None, clicked_text = None, disabled = False, **kwargs):
     self.rect = pg.Rect(rect)
     self.command = command
     self.disabled = disabled
+    self.position = position
     self.clicked = False
     self.hovered = False
-    self.parse_text(text,hover_text,clicked_text)
     self.process_kwargs(kwargs)
-    self.position = position
-    self.fontsize = fontsize
-    if self.text != " ":
-      self.resizefont(self.fontsize)
-    self.render_text()
+    self.parse_text(text, hover_text, clicked_text, InitRun = True, fontsize = fontsize)
 
   def resizefont(self, size=None):
     if size is None:
@@ -38,19 +34,41 @@ class Button(object):
         self.font = pg.font.Font(None, size)
     self.fontsize = size
 
-  def parse_text(self,text,hover_text,clicked_text):
-    if text:
-      self.text = text
-    else:
-      self.text = ""
-    if hover_text:
-      self.hover_text = hover_text
-    else:
-      self.hover_text = self.text
-    if clicked_text:
-      self.clicked_text = clicked_text
-    else:
-      self.clicked_text = self.text
+  def parse_text(self, text, hover_text = None, clicked_text = None, InitRun = False, fontsize = None):
+    if InitRun:
+        self.text = text
+        if self.text != " ":
+            self.resizefont(size = fontsize)
+        else:
+            self.fontsize = fontsize
+        if hover_text:
+          self.hover_text = hover_text
+        else:
+          self.hover_text = self.text
+        if clicked_text:
+          self.clicked_text = clicked_text
+        else:
+          self.clicked_text = self.text
+    if text != self.text:
+        self.text = text
+    if hover_text is None:
+        self.hover_text = self.text
+    elif hover_text != self.hover_text:
+        self.hover_text = hover_text
+    if clicked_text is None:
+        self.clicked_text = self.text
+    elif clicked_text != self.clicked_text:
+        self.clicked_text = clicked_text
+    self.render_text()
+
+  def render_text(self):
+    if self.hover_font_color:
+      color = self.hover_font_color
+      self.hover_text_render = self.font.render(self.hover_text, True, color)
+    if self.clicked_font_color:
+      color = self.clicked_font_color
+      self.clicked_text_render = self.font.render(self.clicked_text, True, color)
+    self.text_render = self.font.render(self.text, True, self.font_color)
 
   def process_kwargs(self, kwargs):
     settings = {
@@ -79,19 +97,10 @@ class Button(object):
         raise AttributeError("{} has no keyword: {}".format(self.__class__.__name__, kwarg))
     self.__dict__.update(settings)
 
-  def render_text(self):
-    if self.hover_font_color:
-      color = self.hover_font_color
-      self.hover_text_render = self.font.render(self.hover_text, True, color)
-    if self.clicked_font_color:
-      color = self.clicked_font_color
-      self.clicked_text_render = self.font.render(self.clicked_text, True, color)
-    self.text_render = self.font.render(self.text, True, self.font_color)
-
   def get_event(self, event):
-    if event.type  ==  pg.MOUSEBUTTONDOWN and event.button  ==  1:
+    if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
       self.on_click(event)
-    elif event.type  ==  pg.MOUSEBUTTONUP and event.button  ==  1:
+    elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
       self.on_release(event)
 
   def on_click(self, event):
@@ -100,7 +109,6 @@ class Button(object):
 
   def on_release(self, event):
     if self.clicked and self.call_on_release:
-      # if user is still within button rect upon mouse release
       if self.rect.collidepoint(pg.mouse.get_pos()):
         self.command()
     self.clicked = False
@@ -433,12 +441,13 @@ class GameBoard():
 
 
 class Node():
-  def __init__(self, action = None, parent = None, board = None):
+  def __init__(self, treelevel, action = None, parent = None, board = None):
     self.parent = parent
     self.board = board
     self.children = []
     self.wins = 0
     self.visits = 0
+    self.treelevel = treelevel
     self.untried_actions = board.availablepositions()
     self.action = action
 
@@ -447,7 +456,7 @@ class Node():
     return s[-1]
 
   def expand(self, board, action):
-    child = Node(parent = self, action = action, board = board)
+    child = Node(treelevel = self.treelevel + 1, parent = self, action = action, board = board)
     self.children.append(child)
     return child
 
@@ -457,8 +466,8 @@ class Node():
 
 
 def UCT(rootstate, maxiters):
-  iterationruntime = datetime.timedelta(seconds = 5)
-  root = Node(board = rootstate)
+  iterationruntime = datetime.timedelta(seconds=5)
+  root = Node(board=rootstate, treelevel=1)
 
   time_start = datetime.datetime.now()
   for i in range(maxiters):
@@ -469,7 +478,7 @@ def UCT(rootstate, maxiters):
     boardsim.turnnum = copy.deepcopy(rootstate.turnnum)
 
     # selection - select best child if parent fully expanded and not terminal
-    if np.size(node.untried_actions)  ==  0 and node.children != []:
+    if np.size(node.untried_actions) == 0 and node.children != []:
       node = node.select()
       boardsim.makenextplay(node.action)
 
@@ -495,10 +504,13 @@ def UCT(rootstate, maxiters):
     # backpropagation - propagate result of rollout game up the tree
     # reverse the result if player at the node lost the rollout game
     while node != None:
-      result = boardsim.endgame()
+      print(node.treelevel)
+      print(boardsim.positions)
+      result = boardsim.endgame()/node.treelevel
+      print(result)
       if result > 0:
-        if node.board.playernum(node.board.turnnum)  ==  boardsim.playernum(node.board.turnnum):
-          result = 2
+        if node.board.playernum(node.board.turnnum) == boardsim.playernum(node.board.turnnum):
+          result = 1
         else:
           result = -1
       node.update(result)
@@ -509,6 +521,7 @@ def UCT(rootstate, maxiters):
       break
 
   s = sorted(root.children, key = lambda c: c.wins / c.visits)
+  print([i.action for i in s])
   return tuple(s[-1].action)
 
 
@@ -611,12 +624,21 @@ def CreateWinScreenFunc(screensize, board):
     else:
       victorytext = "Player "+ str(board.playernum(board.previousturnnum()))+ " wins!"
 
-  b = Button(rect = (0, screensize[1]*3/8, screensize[0], screensize[1]*1/4), disabled = True, text = victorytext, **buttonsettings)
-  btns.append(b)
+  window = Button(rect = (0, screensize[1]*3/8, screensize[0], screensize[1]*1/4), text = victorytext, disabled = True, **buttonsettings)
+  wndws["End Game"] = window
   b = Button(rect = (screensize[0] * 1/2-150, screensize[1]*5/8, 300, 100), command = ResetBoardFunc, text = "Restart",
         **buttonsettings)
   btns.append(b)
   EndGameScreenBool = True
+
+def CalculateAIIterations(GameVariablesDict):
+    return int(
+        GameVariablesDict["Difficulty"]["value"] * factorial(
+            GameVariablesDict["Board Width"]["value"] ** 2) * factorial(GameVariablesDict["Total Players"]["value"]) /
+        factorial(GameVariablesDict["Winning Line"]["value"]) / factorial(
+            GameVariablesDict["Board Width"]["value"] ** 2 - GameVariablesDict["Winning Line"]["value"]))
+
+
 
 btns = []
 slds = {}
@@ -624,7 +646,6 @@ wndws = {}
 
 if __name__  ==  '__main__':
   # code pertaining to the main program not in the button module
-  import string
 
   pg.init()
 
@@ -653,31 +674,23 @@ if __name__  ==  '__main__':
     "Human Players": {"function": ChangeHumanPlayerCountFunc, "range": (1, 8), "value":1},
     "Difficulty": {"function": ChangeDifficultyFunc, "range": (1, 10), "value":3},
   }
-
+  gameclock = pg.time.Clock()
+  GameResetBoolean = False
+  EndGameScreenBool = False
+  turn = 0
   screensize = (1920, 1080)
+
   screen = pg.display.set_mode(screensize, pg.RESIZABLE)
   pg.display.set_caption("Noughts and Crosses")
   screen_rect = screen.get_rect()
 
-  CreateSlidersFunc((screensize[1],screensize[1]*1/8,screensize[0]-screensize[1],screensize[1]*8/10), labelsize = (150,50), sliderrectsize = (10,50), GameVariablesDict = GameVariablesDict)
+  CreateSlidersFunc((screensize[1], screensize[1]*1/8, screensize[0]-screensize[1], screensize[1]*8/10), labelsize = (150,50), sliderrectsize = (10,50), GameVariablesDict = GameVariablesDict)
   CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
   CreateDisplayWindowsFunc(slds)
-
-  opponentiterations = int(
-    GameVariablesDict["Difficulty"]["value"]* factorial(GameVariablesDict["Board Width"]["value"]** 2)* factorial(GameVariablesDict["Total Players"]["value"])
-  / factorial(GameVariablesDict["Winning Line"]["value"]) / factorial(GameVariablesDict["Board Width"]["value"] ** 2 - GameVariablesDict["Winning Line"]["value"]))
-
   board = GameBoard(GameVariablesDict)
-
-  #for i in range(0, GameVariablesDict["Human Players"]["value"]):
-  #  print("\nHuman player ", i + 1, "you are player", board.humanturnnums[i] + 1, "your piece is",
-  #     board.gametokens[board.playernum(board.humanturnnums[i])])
-
-  gameclock = pg.time.Clock()
   GameOver = board.endgame()
-  GameResetBoolean = False
-  EndGameScreenBool = False
-  turn = 0
+
+  opponentiterations = CalculateAIIterations(GameVariablesDict)
 
   while True:
     screen.fill(pg.Color("Black"))
@@ -713,40 +726,32 @@ if __name__  ==  '__main__':
         screen.blit(screencopy, (0,0))
       for btn in btns:
         btn.get_event(event)
+        if btn.position:
+            if board.positions[btn.position] == " ":
+                btn.parse_text(text = board.positions[btn.position], hover_text = board.playertoken(turn), clicked_text = board.playertoken(turn))
+            else:
+                btn.parse_text(text = board.positions[btn.position], hover_text = board.positions[btn.position], clicked_text = board.positions[btn.position])
+        btn.draw(screen)
       for key in slds.keys():
         slds[key].get_event(event)
         if slds[key].clicked:
           notchvalue = slds[key].findnearestnotch(mouse)
           slds[key].sliderrect = slds[key].movetonotch(slds[key].sliderrect,notchvalue)
-          wndws[key].text = str(notchvalue)
-          wndws[key].render_text()
+          wndws[key].parse_text(str(notchvalue))
+        slds[key].draw(screen)
+
       if turn != board.turnnum and wndws != {}:
-        wndws["Current Turn"].text = str("Player "+ str(board.playernum(board.turnnum))+ "'s turn")
-        wndws["Current Turn"].hover_text = wndws["Current Turn"].clicked_text = wndws["Current Turn"].text
-        wndws["Current Turn"].render_text()
+        turntext = "Player " + str(board.playernum(board.turnnum)) + "'s turn"
+        wndws["Current Turn"].parse_text(turntext)
         turn = board.turnnum
-      for btn in btns:
-        if btn.position:
-          btn.text = board.positions[btn.position]
-          if btn.text  ==  " ":
-            btn.hover_text = btn.clicked_text = board.playertoken(turn)
-          else:
-            btn.hover_text = btn.clicked_text = btn.text
-          btn.render_text()
-        btn.draw(screen)
-      for sld in slds.values():
-        sld.draw(screen)
       for wndw in wndws.values():
         wndw.draw(screen)
       pg.display.update()
-    gameclock.tick(40)
     GameOver = board.endgame()
 
     if GameOver != -1:
       if not EndGameScreenBool:
         CreateWinScreenFunc(screensize, board)
-      else:
-        pass
     else:
       if board.turnnum not in board.humanturnnums:
         board.makenextplay(UCT(board, opponentiterations))
@@ -764,12 +769,8 @@ if __name__  ==  '__main__':
       EndGameScreenBool = False
       turn = -1
       GameOver = -1
-      opponentiterations = int(
-        GameVariablesDict["Difficulty"]["value"] * factorial(
-          GameVariablesDict["Board Width"]["value"] ** 2) * factorial(
-          GameVariablesDict["Total Players"]["value"])
-        / factorial(GameVariablesDict["Winning Line"]["value"]) / factorial(
-          GameVariablesDict["Board Width"]["value"] ** 2 - GameVariablesDict["Winning Line"]["value"]))
+      opponentiterations = CalculateAIIterations(GameVariablesDict)
+
 
 
 
