@@ -6,7 +6,7 @@ import concurrent.futures
 import threading
 import random
 import string
-import datetime
+import time
 from math import log, sqrt, factorial
 
 
@@ -452,7 +452,7 @@ class GameBoard():
 
 
 class Node():
-    def __init__(self, treelevel, action=None, parent=None, board=None):
+    def __init__(self, TreeLevel, action=None, parent=None, board=None):
         self.parent = parent
         self.board = copy.deepcopy(board)
         if action is not None:
@@ -460,18 +460,17 @@ class Node():
         self.children = []
         self.score = 0
         self.visits = 0
-        self.treelevel = treelevel
+        self.TreeLevel = TreeLevel
         self.untried_actions = self.board.availablepositions()
         self.action = action
 
     def select(self):
         s = sorted(self.children, key=lambda c: c.score / c.visits + 0.2 * sqrt(2 * log(self.visits) / c.visits))
-        #s[-1].visits += 1
         s[-1].score -= 1
         return s[-1]
 
     def expand(self, action):
-        child = Node(treelevel=self.treelevel + 1, parent=self, action=action, board=self.board)
+        child = Node(TreeLevel=self.TreeLevel + 1, parent=self, action=action, board=self.board)
         self.children.append(child)
         self.untried_actions.remove(action)
         return child
@@ -481,86 +480,76 @@ class Node():
         self.score += result + 1
 
 
-
-def UCTIteration(node, player, lock):
-    # selection - select best child if parent fully expanded and not terminal
-    lock.acquire()
-    while not node.untried_actions and node.children:
-        node = node.select()
-    lock.release()
+def UCTIteration(node, player, lock, times):
+    start = time.time()
 
     # expansion - expand parent to a random untried action
     if len(node.untried_actions) > 0:
-        action = random.choice(node.untried_actions)
-        node = node.expand(action)
         # simulation - rollout to terminal state from current
         # state using random actions
         while node.board.endgame() < 0:
             action = random.choice(node.untried_actions)
+            lock.acquire()
             node = node.expand(action)
+            lock.release()
 
     # back propagation - propagate result of rollout game up the tree
     # reverse the result if player at the node lost the rollout game
     if node.board.endgame() >= 0:
-        # result = node.board.endgame() / node.treelevel
+        # result = node.board.endgame() / node.TreeLevel
         result = 0
         if node.board.endgame() != 0:
             if node.board.endgame() == player:
-                result = 1 / node.treelevel
+                result = 1 / node.TreeLevel
             else:
-                result = -2 / node.treelevel
-        lock.acquire()
+                result = -2 / node.TreeLevel
         while node is not None:
+            lock.acquire()
             node.update(result)
-            # print("Level", node.treelevel,"Result", result,node.board.positions)
+            lock.release()
+            # print("Level", node.TreeLevel,"Result", result,node.board.positions)
             node = node.parent
-        lock.release
+    times.append(start)
 
 
 def Opponent_Function(rootstate, maxiters):
     player = rootstate.playernum(rootstate.turnnum)
-    print(player)
     global GameResetBoolean
     global root
     newroot = root[player]
     lock = threading.RLock()
 
     while len(newroot.board.actiontracker) < len(rootstate.actiontracker):
-        if newroot.children != []:
-            print("Select child")
+        if newroot.children:
             child = [child for child in newroot.children if child.action == rootstate.actiontracker[len(newroot.board.actiontracker)][2]]
             if len(child) > 0:
                 child = child[0]
         else:
-            print(rootstate.actiontracker)
-            print(newroot.board.actiontracker)
-            print(rootstate.actiontracker[len(newroot.board.actiontracker)])
-            print(rootstate.actiontracker[len(newroot.board.actiontracker)][2])
-
             child = newroot.expand(rootstate.actiontracker[len(newroot.board.actiontracker)][2])
         if child:
             newroot = child
         else:
             break
-    node = newroot
 
-    f = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        f.append(executor.submit(UCTIteration(node, player, lock)))
-        f.append(executor.submit(UCTIteration(node, player, lock)))
-        f.append(executor.submit(UCTIteration(node, player, lock)))
-        f.append(executor.submit(UCTIteration(node, player, lock)))
-        for i in range(maxiters):
+    times = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for iteration in np.arange(maxiters):
+            lock.acquire()
+            node = newroot
+            # selection - select best child if parent fully expanded and not terminal
+            while not node.untried_actions and node.children:
+                node = node.select()
+            lock.release()
+            executor.submit(UCTIteration(node, player, lock, times))
             if GameResetBoolean:
                 break
-            if concurrent.futures.as_completed(f):
-                f.append(executor.submit(UCTIteration(node, player, lock)))
 
     s = sorted(newroot.children, key=lambda c: c.score / c.visits)
 
     for child in newroot.children:
         print("Visits", child.visits, "score", child.score, "\n", child.board.positions)
 
+    print(np.diff(times))
     return tuple(s[-1].action)
 
 
@@ -637,21 +626,21 @@ def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, GameVariablesDic
 def CreateDisplayWindowsFunc(sliders):
     global wndws, screensize
     wndws = {}
-    firstsliderbool=True
+    firstsliderbool = True
     for key in sliders.keys():
         rect = sliders[key].rect
         rectposition = rect.topleft
         windowrect = (rectposition[0]+rect.size[0]+30, rectposition[1], 40, rect.size[1])
         if firstsliderbool:
-            window = Button(windowrect, text = str(sliders[key].startingvalue), disabled = True, **buttonsettings)
+            window = Button(windowrect, text = str(sliders[key].startingvalue), disabled=True, **buttonsettings)
             wndws[key] = window
             fontsize = window.fontsize
         else:
             window = Button(windowrect, text=str(sliders[key].startingvalue), fontsize=fontsize, disabled=True, **buttonsettings)
             wndws[key] = window
 
-    currentturnrect = (screensize[1],0,screensize[0]-screensize[1],150)
-    wndws["Current Turn"] = Button(currentturnrect, text = "Player 1's turn", disabled = True, **buttonsettings)
+    currentturnrect = (screensize[1], 0, screensize[0]-screensize[1], 150)
+    wndws["Current Turn"] = Button(currentturnrect, text="Player 1's turn", disabled=True, **buttonsettings)
 
 def CreateWinScreenFunc(screensize, board):
     global btns, slds, wndws, EndGameScreenBool
@@ -675,10 +664,10 @@ def CreateWinScreenFunc(screensize, board):
     EndGameScreenBool = True
 
 def CalculateAIIterations(GameVariablesDict):
-    return int(GameVariablesDict["Difficulty"]["value"]*(GameVariablesDict["Board Width"]["value"]**2)**3)
+    return int(GameVariablesDict["Difficulty"]["value"]*(GameVariablesDict["Board Width"]["value"]**2)**2)
 
 def CreateRootNodes():
-    rootcopy = Node(board=boardsim, treelevel=1)
+    rootcopy = Node(board=boardsim, TreeLevel=1)
     root = {}
     for turn in board.AITurnNums:
         root[board.playernum(turn)] = rootcopy
@@ -730,7 +719,8 @@ if __name__  ==  '__main__':
     pg.display.set_caption("Noughts and Crosses")
     screen_rect = screen.get_rect()
 
-    CreateSlidersFunc((screensize[1], screensize[1]*1/8, screensize[0]-screensize[1], screensize[1]*8/10), labelsize = (150,50), sliderrectsize = (10,50), GameVariablesDict = GameVariablesDict)
+    CreateSlidersFunc((screensize[1], screensize[1]*1/8, screensize[0]-screensize[1], screensize[1]*8/10),
+                      labelsize=(150, 50), sliderrectsize=(10, 50), GameVariablesDict=GameVariablesDict)
     CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
     CreateDisplayWindowsFunc(slds)
 
@@ -739,16 +729,12 @@ if __name__  ==  '__main__':
 
     #Create a copy of the board for the UCT algorithm to modify
     boardsim = GameBoard(board.VariablesDict)
-    #boardsim.positions = copy.deepcopy(board.positions)
-    #boardsim.actiontracker = copy.deepcopy(board.actiontracker)
     boardsim.gametokens = board.gametokens
-    #boardsim.turnnum = copy.deepcopy(board.turnnum)
 
     #Create the top level node for all simulations of board states
     root = CreateRootNodes()
 
     opponentiterations = CalculateAIIterations(GameVariablesDict)
-
 
     while True:
         screen.fill(pg.Color("Black"))
@@ -801,7 +787,7 @@ if __name__  ==  '__main__':
                     wndws[key].parse_text(str(notchvalue))
                 slds[key].draw(screen)
 
-            if turn != board.turnnum and wndws != {}:
+            if turn != board.turnnum and wndws and GameOver == -1:
                 turntext = "Player " + str(board.playernum(board.turnnum)) + "'s turn"
                 wndws["Current Turn"].parse_text(turntext)
                 turn = board.turnnum
