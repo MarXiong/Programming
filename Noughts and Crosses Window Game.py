@@ -528,16 +528,15 @@ def Opponent_Function(rootstate, maxiters):
     while len(newroot.board.actiontracker) < len(rootstate.actiontracker):
         if newroot.children != []:
             print("Select child")
-            child = [child for child in newroot.children if
-                 child.action == rootstate.actiontracker[len(newroot.board.actiontracker)][2]]
+            child = [child for child in newroot.children if child.action == rootstate.actiontracker[len(newroot.board.actiontracker)][2]]
             if len(child) > 0:
                 child = child[0]
-
         else:
             print(rootstate.actiontracker)
             print(newroot.board.actiontracker)
             print(rootstate.actiontracker[len(newroot.board.actiontracker)])
             print(rootstate.actiontracker[len(newroot.board.actiontracker)][2])
+
             child = newroot.expand(rootstate.actiontracker[len(newroot.board.actiontracker)][2])
         if child:
             newroot = child
@@ -556,7 +555,6 @@ def Opponent_Function(rootstate, maxiters):
                 break
             if concurrent.futures.as_completed(f):
                 f.append(executor.submit(UCTIteration(node, player, lock)))
-
 
     s = sorted(newroot.children, key=lambda c: c.score / c.visits)
 
@@ -679,6 +677,13 @@ def CreateWinScreenFunc(screensize, board):
 def CalculateAIIterations(GameVariablesDict):
     return int(GameVariablesDict["Difficulty"]["value"]*(GameVariablesDict["Board Width"]["value"]**2)**3)
 
+def CreateRootNodes():
+    rootcopy = Node(board=boardsim, treelevel=1)
+    root = {}
+    for turn in board.AITurnNums:
+        root[board.playernum(turn)] = rootcopy
+    return root
+
 
 btns = []
 slds = {}
@@ -740,10 +745,7 @@ if __name__  ==  '__main__':
     #boardsim.turnnum = copy.deepcopy(board.turnnum)
 
     #Create the top level node for all simulations of board states
-    rootcopy = Node(board=boardsim, treelevel=1)
-    root = {}
-    for turn in board.AITurnNums:
-        root[board.playernum(turn)] = rootcopy
+    root = CreateRootNodes()
 
     opponentiterations = CalculateAIIterations(GameVariablesDict)
 
@@ -822,6 +824,7 @@ if __name__  ==  '__main__':
             screen.fill(pg.Color("Black"))
             factor = board.boardsize / GameVariablesDict["Board Width"]["value"] - 1
             board = GameBoard(GameVariablesDict)
+            root = CreateRootNodes()
             CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
             CreateSlidersFunc((screensize[1], screensize[1] * 1 / 8, screensize[0] - screensize[1], screensize[1] * 9 / 10),
                               labelsize = (150, 50), sliderrectsize = (10, 50), GameVariablesDict = GameVariablesDict)
