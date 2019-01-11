@@ -671,6 +671,32 @@ def CreateWinScreenFunc(screensize, board):
     btns.append(b)
     EndGameScreenBool = True
 
+def GameResetFunc():
+    global screen, factor
+    global btns, slds, wndws
+    global GameVariablesDict, GameOver, GameResetBoolean, EndGameScreenBool
+    global board, boardsim, root, turn, iterations, OpponentIterations
+
+    screen.fill(pg.Color("Black"))
+    factor = board.boardsize / GameVariablesDict["Board Width"]["value"] - 1
+
+    board = GameBoard(GameVariablesDict)
+    boardsim = CopyBoard(board)
+    root = CreateRootNodes()
+    OpponentIterations = CalculateAIIterations(GameVariablesDict)
+
+    CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
+    CreateSlidersFunc(
+        (screensize[1], screensize[1] * 1 / 8, screensize[0] - screensize[1], screensize[1] * 9 / 10),
+        labelsize=(150, 50), sliderrectsize=(10, 50))
+    CreateDisplayWindowsFunc(slds)
+
+    GameResetBoolean = False
+    EndGameScreenBool = False
+    turn = -1
+    iterations = 0
+    GameOver = -1
+
 
 def ScreenUpdate():
     global screen
@@ -822,6 +848,7 @@ if __name__  ==  '__main__':
     lock = threading.RLock()
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
+        print("Iterations", OpponentIterations)
         while True:
             executor.submit(ScreenUpdate())
             GameOver = board.endgame()
@@ -832,9 +859,8 @@ if __name__  ==  '__main__':
                         btn.disabled = False
             else:
                 if turn != board.TurnNum:
-                    iterations = 0
                     turn = board.TurnNum
-                    if wndws:
+                    if wndws["Current Turn"]:
                         turntext = "Player " + str(board.playernum(board.TurnNum)) + "'s turn"
                         wndws["Current Turn"].parse_text(turntext)
                     for btn in btns:
@@ -849,10 +875,12 @@ if __name__  ==  '__main__':
                     player = board.playernum(current_turn)
                     newroot = UpdateRootNode(board, player, lock)
 
-                if iterations > OpponentIterations and turn in board.AITurnNums:
+                if newroot.visits > OpponentIterations and turn in board.AITurnNums:
                     print("Opponent Turn")
+                    print("Visits", newroot.visits)
                     Opponent_play = PickOpponentMove(newroot)
                     board.makenextplay(Opponent_play)
+                    iterations = 0
 
                 loop_start_time = datetime.datetime.now()
                 while datetime.datetime.now() - loop_start_time < refresh_time:
@@ -860,21 +888,4 @@ if __name__  ==  '__main__':
                     iterations += 1
 
             if GameResetBoolean:
-                screen.fill(pg.Color("Black"))
-                factor = board.boardsize / GameVariablesDict["Board Width"]["value"] - 1
-
-                board = GameBoard(GameVariablesDict)
-                boardsim = CopyBoard(board)
-                root = CreateRootNodes()
-                OpponentIterations = CalculateAIIterations(GameVariablesDict)
-
-                CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
-                CreateSlidersFunc(
-                    (screensize[1], screensize[1] * 1 / 8, screensize[0] - screensize[1], screensize[1] * 9 / 10),
-                    labelsize=(150, 50), sliderrectsize=(10, 50))
-                CreateDisplayWindowsFunc(slds)
-
-                GameResetBoolean = False
-                EndGameScreenBool = False
-                turn = -1
-                GameOver = -1
+                GameResetFunc()
