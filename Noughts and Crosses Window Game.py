@@ -671,6 +671,7 @@ def CreateWinScreenFunc(screensize, board):
     btns.append(b)
     EndGameScreenBool = True
 
+
 def GameResetFunc():
     global screen, factor
     global btns, slds, wndws
@@ -763,7 +764,7 @@ def ScreenUpdate():
 
 
 def CalculateAIIterations(GameVariablesDict):
-    return int(GameVariablesDict["Difficulty"]["value"]*(GameVariablesDict["Board Width"]["value"]**2)**2)
+    return int(GameVariablesDict["Difficulty"]["value"]*(GameVariablesDict["Board Width"]["value"]**2)*5)
 
 
 def CreateRootNodes():
@@ -810,10 +811,10 @@ if __name__  ==  '__main__':
         'border_color': (0, 0, 0),
     }
     GameVariablesDict = {
-        "Board Width": {"function": ChangeBoardSizeFunc, "range": (3, 7), "value": 3},
+        "Board Width": {"function": ChangeBoardSizeFunc, "range": (3, 8), "value": 3},
         "Winning Line": {"function": ChangeWinningLineFunc, "range": (2, 8), "value": 3},
         "Total Players": {"function": ChangePlayerCountFunc, "range": (2, 8), "value": 2},
-        "Human Players": {"function": ChangeHumanPlayerCountFunc, "range": (1, 8), "value": 1},
+        "Human Players": {"function": ChangeHumanPlayerCountFunc, "range": (0, 8), "value": 1},
         "Difficulty": {"function": ChangeDifficultyFunc, "range": (1, 10), "value": 5},
     }
 
@@ -848,7 +849,6 @@ if __name__  ==  '__main__':
     lock = threading.RLock()
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        print("Iterations", OpponentIterations)
         while True:
             executor.submit(ScreenUpdate())
             GameOver = board.endgame()
@@ -877,10 +877,9 @@ if __name__  ==  '__main__':
 
                 if newroot.visits > OpponentIterations and turn in board.AITurnNums:
                     print("Opponent Turn")
-                    print("Visits", newroot.visits)
                     Opponent_play = PickOpponentMove(newroot)
                     board.makenextplay(Opponent_play)
-                    iterations = 0
+                    iterations += 1
 
                 loop_start_time = datetime.datetime.now()
                 while datetime.datetime.now() - loop_start_time < refresh_time:
@@ -889,3 +888,4 @@ if __name__  ==  '__main__':
 
             if GameResetBoolean:
                 GameResetFunc()
+                
