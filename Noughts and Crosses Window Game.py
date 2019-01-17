@@ -7,11 +7,12 @@ import threading
 import random
 import string
 import time, datetime
-from math import log, sqrt, factorial
+from math import log, sqrt
 
 
 class Button(object):
-    def __init__(self, rect, command = None, position = None, text = None, fontsize = None, hover_text = None, clicked_text = None, disabled = False, **kwargs):
+    def __init__(self, rect, command=None, position=None, text=None, fontsize=None, hover_text=None,
+                 clicked_text=None, disabled=False, **kwargs):
         self.rect = pg.Rect(rect)
         self.command = command
         self.disabled = disabled
@@ -102,13 +103,13 @@ class Button(object):
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
                 self.on_click(event)
             elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
-                self.on_release(event)
+                self.on_release()
 
     def on_click(self, event):
         if self.rect.collidepoint(event.pos):
             self.clicked = True
 
-    def on_release(self, event):
+    def on_release(self):
         if self.clicked and self.call_on_release:
             if self.rect.collidepoint(pg.mouse.get_pos()):
                 self.command()
@@ -116,12 +117,12 @@ class Button(object):
 
     def check_hover(self):
         if self.rect.collidepoint(pg.mouse.get_pos()):
-          if not self.hovered:
-            self.hovered = True
-            if self.hover_sound:
-              self.hover_sound.play()
+            if not self.hovered:
+                self.hovered = True
+                if self.hover_sound:
+                    self.hover_sound.play()
         else:
-          self.hovered = False
+            self.hovered = False
 
     def draw(self, surface):
         color = self.color
@@ -129,28 +130,28 @@ class Button(object):
         border = self.border_color
         self.check_hover()
         if not self.disabled:
-          if self.clicked:
-            color = self.clicked_color
-            if self.clicked_font_color:
-              text = self.clicked_text_render
-          elif self.hovered and self.hover_color:
-            color = self.hover_color
-            if self.hover_font_color:
-              text = self.hover_text_render
-          if self.hovered and not self.clicked:
-            border = self.border_hover_color
+            if self.clicked:
+                color = self.clicked_color
+                if self.clicked_font_color:
+                    text = self.clicked_text_render
+            elif self.hovered and self.hover_color:
+                color = self.hover_color
+                if self.hover_font_color:
+                    text = self.hover_text_render
+            if self.hovered and not self.clicked:
+                border = self.border_hover_color
         else:
-          color = self.disabled_color
+            color = self.disabled_color
         if self.radius:
-          rad = self.radius
+            rad = self.radius
         else:
-          rad = 0
+            rad = 0
         self.round_rect(surface, self.rect, border, rad, 1, color)
         if text:
-          text_rect = text.get_rect(center = self.rect.center)
-          surface.blit(text, text_rect)
+            text_rect = text.get_rect(center=self.rect.center)
+            surface.blit(text, text_rect)
 
-    def round_rect(self, surface, rect, color, rad = 20, border = 0, inside = (0, 0, 0, 0)):
+    def round_rect(self, surface, rect, color, rad=20, border=0, inside=(0, 0, 0, 0)):
         rect = pg.Rect(rect)
         zeroed_rect = rect.copy()
         zeroed_rect.topleft = 0, 0
@@ -158,34 +159,36 @@ class Button(object):
         image.fill((0, 0, 0, 0))
         self._render_region(image, zeroed_rect, color, rad)
         if border:
-          zeroed_rect.inflate_ip(-2 * border, -2 * border)
-          self._render_region(image, zeroed_rect, inside, rad)
+            zeroed_rect.inflate_ip(-2 * border, -2 * border)
+            self._render_region(image, zeroed_rect, inside, rad)
         surface.blit(image, rect)
 
     def _render_region(self, image, rect, color, rad):
         corners = rect.inflate(-2 * rad, -2 * rad)
         for attribute in ("topleft", "topright", "bottomleft", "bottomright"):
-          pg.draw.circle(image, color, getattr(corners, attribute), rad)
+            pg.draw.circle(image, color, getattr(corners, attribute), rad)
         image.fill(color, rect.inflate(-2 * rad, 0))
         image.fill(color, rect.inflate(0, -2 * rad))
 
 
 class Slider(object):
-    def __init__(self, rect, sliderrectsize, startingvalue, command, slideroffset = None, text = None, hover_text = None, clicked_text = None, xlimit = None, ylimit = None, valuerange = (0,0), *args, **kwargs):
+    def __init__(self, rect, sliderrectsize, startingvalue, command, slideroffset=None, text=None, hover_text=None, 
+                 clicked_text=None, xlimit=None, ylimit=None, valuerange=(0, 0), **kwargs):
         self.rect = pg.Rect(rect)
         self.command = command
         self.startingvalue = startingvalue
-        self.nearestnotch = startingvalue
+        self.nearest_notch_value = startingvalue
         self.valuerange = valuerange
         self.notches = valuerange[1] - valuerange[0]
         self.clicked = False
         self.hovered = False
-        self.parse_text(text,hover_text,clicked_text)
-        self.set_limits(xlimit,ylimit,slideroffset)
+        self.parse_text(text, hover_text, clicked_text)
+        self.set_limits(xlimit, ylimit, slideroffset)
         self.createsliderlines()
         self.sliderrectsize = sliderrectsize
         self.set_notches(self.sliderrectsize)
-        self.sliderrect = pg.Rect(tuple(np.subtract(self.notchpoints[self.startingvalue],tuple([i/2 for i in self.sliderrectsize])))+sliderrectsize)
+        self.sliderrect = pg.Rect(tuple(np.subtract(self.notchpoints[self.startingvalue], 
+                                                    tuple([i/2 for i in self.sliderrectsize])))+sliderrectsize)
         self.process_kwargs(kwargs)
         self.resizefont()
         self.render_text()
@@ -200,11 +203,11 @@ class Slider(object):
         if xlimit is not None:
           self.xlimit = xlimit
         else:
-          self.xlimit = (self.rect.centerx+slideroffset[0],self.rect.centerx+slideroffset[0])
+          self.xlimit = (self.rect.centerx+slideroffset[0], self.rect.centerx+slideroffset[0])
         if ylimit is not None:
           self.ylimit = ylimit
         else:
-          self.ylimit = (self.rect.centery+slideroffset[1],self.rect.centery+slideroffset[1])
+          self.ylimit = (self.rect.centery+slideroffset[1], self.rect.centery+slideroffset[1])
 
     def set_notches(self, sliderrectsize):
         increment = np.subtract(self.endpoints[1],self.endpoints[0])/self.notches
@@ -213,45 +216,47 @@ class Slider(object):
         self.notchpoints = {}
         notchnumber = 0
         for notch in np.arange(self.valuerange[0],self.valuerange[1]+1):
-          self.notchpoints[notch] = tuple(self.endpoints[0]+increment*notchnumber)
-          self.notchlines[notch] = [(self.endpoints[0]+increment*notchnumber+linewidth),(self.endpoints[0]+increment*notchnumber-linewidth)]
-          notchnumber += 1
+            self.notchpoints[notch] = tuple(self.endpoints[0]+increment*notchnumber)
+            self.notchlines[notch] = [(self.endpoints[0]+increment*notchnumber+linewidth),
+                                    (self.endpoints[0]+increment*notchnumber-linewidth)]
+            notchnumber += 1
 
     def findnearestnotch(self, position):
-        notchdistances = {np.linalg.norm(np.subtract(value[1], position)):value[0] for value in self.notchpoints.items()}
-        self.nearestnotch = notchdistances[min(notchdistances.keys())]
-        return self.nearestnotch
+        notchdistances = {np.linalg.norm(np.subtract(value[1], position))
+                          : value[0] for value in self.notchpoints.items()}
+        self.nearest_notch_value = notchdistances[min(notchdistances.keys())]
+        return self.nearest_notch_value
 
     def movetonotch(self, rect, notchvalue):
         rect = rect.move(np.subtract(self.notchpoints[notchvalue], rect.center))
         return rect
 
     def resizefont(self, size=None):
-          if size is None:
-              size = self.rect.height
-              while np.any(np.less(self.font.size(self.text),[0.95*i for i in self.rect.size])):
+        if size is None:
+            size = self.rect.height
+            while np.any(np.less(self.font.size(self.text),[0.95*i for i in self.rect.size])):
                 self.font = pg.font.Font(None,size)
                 size += 1
-              while np.any(np.greater(self.font.size(self.text),[0.95*i for i in self.rect.size])):
+            while np.any(np.greater(self.font.size(self.text),[0.95*i for i in self.rect.size])):
                 self.font = pg.font.Font(None,size)
                 size -= 1
-          else:
-              self.font = pg.font.Font(None, size)
-          self.fontsize = size
+            else:
+                self.font = pg.font.Font(None, size)
+            self.fontsize = size
 
     def parse_text(self,text,hover_text,clicked_text):
         if text:
-          self.text = text
+            self.text = text
         else:
-          self.text = ""
+            self.text = ""
         if hover_text:
-          self.hover_text = hover_text
+            self.hover_text = hover_text
         else:
-          self.hover_text = self.text
+            self.hover_text = self.text
         if clicked_text:
-          self.clicked_text = clicked_text
+            self.clicked_text = clicked_text
         else:
-          self.clicked_text = self.text
+            self.clicked_text = self.text
 
     def process_kwargs(self, kwargs):
         settings = {
@@ -274,10 +279,10 @@ class Slider(object):
           'radius': 3,
         }
         for kwarg in kwargs:
-          if kwarg in settings:
-            settings[kwarg] = kwargs[kwarg]
-          else:
-            raise AttributeError("{} has no keyword: {}".format(self.__class__.__name__, kwarg))
+            if kwarg in settings:
+                settings[kwarg] = kwargs[kwarg]
+            else:
+                raise AttributeError("{} has no keyword: {}".format(self.__class__.__name__, kwarg))
         self.__dict__.update(settings)
 
     def render_text(self):
@@ -290,30 +295,30 @@ class Slider(object):
         self.text_render = self.font.render(self.text, True, self.font_color)
 
     def get_event(self, event):
-        if event.type  ==  pg.MOUSEBUTTONDOWN and event.button  ==  1:
-          self.on_click(event)
-        elif event.type  ==  pg.MOUSEBUTTONUP and event.button  ==  1:
-          self.on_release(event)
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+            self.on_click(event)
+        elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
+            self.on_release()
 
     def on_click(self, event):
         if self.sliderrect.collidepoint(event.pos):
             self.clicked = True
 
-    def on_release(self, event):
+    def on_release(self):
         if self.clicked and self.call_on_release:
           #  if user is still within button rect upon mouse release
-          if pg.mouse.get_rel():
-            self.command(self.nearestnotch)
+            if pg.mouse.get_rel():
+                self.command(self.nearest_notch_value)
         self.clicked = False
 
     def check_hover(self):
         if self.sliderrect.collidepoint(pg.mouse.get_pos()):
-          if not self.hovered:
-            self.hovered = True
-            if self.hover_sound:
-              self.hover_sound.play()
+            if not self.hovered:
+                self.hovered = True
+                if self.hover_sound:
+                    self.hover_sound.play()
         else:
-          self.hovered = False
+            self.hovered = False
 
     def draw(self, surface):
         color = self.color
@@ -321,32 +326,32 @@ class Slider(object):
         border = self.border_color
         self.check_hover()
         if not self.disabled:
-          if self.clicked:
-            color = self.clicked_color
-            if self.clicked_font_color:
-              text = self.clicked_text_render
-          elif self.hovered and self.hover_color:
-            color = self.hover_color
-            if self.hover_font_color:
-              text = self.hover_text_render
-          if self.hovered and not self.clicked:
-            border = self.border_hover_color
+            if self.clicked:
+                color = self.clicked_color
+                if self.clicked_font_color:
+                    text = self.clicked_text_render
+            elif self.hovered and self.hover_color:
+                color = self.hover_color
+                if self.hover_font_color:
+                    text = self.hover_text_render
+            if self.hovered and not self.clicked:
+                border = self.border_hover_color
         else:
-          color = self.disabled_color
+            color = self.disabled_color
         pg.draw.line(surface, color, self.endpoints[0],self.endpoints[1])
         for notch in self.notchlines:
-          pg.draw.line(surface, color, self.notchlines[notch][0], self.notchlines[notch][1])
+            pg.draw.line(surface, color, self.notchlines[notch][0], self.notchlines[notch][1])
         if self.radius:
-          rad = self.radius
+            rad = self.radius
         else:
-          rad = 0
+            rad = 0
         self.round_rect(surface, self.rect, border, rad, 1, color)
         self.round_rect(surface, self.sliderrect, border, rad, 1, color)
         if text:
-          text_rect = text.get_rect(center = self.rect.center)
-          surface.blit(text, text_rect)
+            text_rect = text.get_rect(center=self.rect.center)
+            surface.blit(text, text_rect)
 
-    def round_rect(self, surface, rect, color, rad = 20, border = 0, inside = (0, 0, 0, 0)):
+    def round_rect(self, surface, rect, color, rad=20, border=0, inside=(0, 0, 0, 0)):
         rect = pg.Rect(rect)
         zeroed_rect = rect.copy()
         zeroed_rect.topleft = 0, 0
@@ -354,8 +359,8 @@ class Slider(object):
         image.fill((0, 0, 0, 0))
         self._render_region(image, zeroed_rect, color, rad)
         if border:
-          zeroed_rect.inflate_ip(-2 * border, -2 * border)
-          self._render_region(image, zeroed_rect, inside, rad)
+            zeroed_rect.inflate_ip(-2 * border, -2 * border)
+            self._render_region(image, zeroed_rect, inside, rad)
         surface.blit(image, rect)
 
     def _render_region(self, image, rect, color, rad):
@@ -367,105 +372,103 @@ class Slider(object):
 
 
 class GameBoard:
-    def __init__(self, VariablesDict):
-        self.VariablesDict = VariablesDict
-        self.boardsize = VariablesDict["Board Width"]["value"]
-        self.positions = np.full((self.boardsize, self.boardsize), " ", 'U1')
-        self.numplayers = VariablesDict["Total Players"]["value"]
-        self.winlinelen = VariablesDict["Winning Line"]["value"]
-        self.humanplayers = VariablesDict["Human Players"]["value"]
+    def __init__(self, parameters_dict):
+        self.parameters_dict = parameters_dict
+        self.board_width = parameters_dict["Board Width"]["value"]
+        self.positions = np.full((self.board_width, self.board_width), " ", 'U1')
+        self.total_players = parameters_dict["Total Players"]["value"]
+        self.winning_line = parameters_dict["Winning Line"]["value"]
+        self.total_humans = parameters_dict["Human Players"]["value"]
         self.gametokens = [" ", "X", "O"]
 
-        self.actiontracker = []
+        self.move_history_dict = []
 
-        if self.numplayers > 2:
-            for i in range(2, self.numplayers):
-                self.addtoken()
+        if self.total_players > 2:
+            for i in range(2, self.total_players):
+                self.add_board_token()
 
-        self.TurnNum = 0
-        self.humanturnnums = np.sort(np.random.choice(self.numplayers, self.humanplayers, replace = False))
-        self.AITurnNums = [turns for turns in np.arange(self.numplayers) if turns not in self.humanturnnums]
+        self.current_turn_number = 0
+        self.human_turn_list = np.sort(np.random.choice(self.total_players, self.total_humans, replace = False))
+        self.ai_turn_list = [turns for turns in np.arange(self.total_players) if turns not in self.human_turn_list]
 
-    def addtoken(self):
+    def add_board_token(self):
         self.gametokens.append(random.choice([i for i in string.ascii_uppercase if i not in self.gametokens]))
 
-    def playernum(self, playerindex):
+    def player_number(self, playerindex):
         return playerindex + 1
 
-    def previousturnnum(self):
-        return (self.TurnNum - 1) % self.numplayers
+    def previous_turn(self):
+        return (self.current_turn_number - 1) % self.total_players
 
-    def playertoken(self, playerindex):
-        return self.gametokens[self.playernum(playerindex)]
+    def player_token(self, playerindex):
+        return self.gametokens[self.player_number(playerindex)]
 
-    def availablepositions(self):
-        AvailablePositionsArray = np.asarray(np.where((self.positions == self.gametokens[0]) == True))
-        AvailablePositionsTuples = []
-        for col in range(0, AvailablePositionsArray.shape[1]):
-          AvailablePositionsTuples.append(tuple(AvailablePositionsArray[:, col]))
-        return AvailablePositionsTuples
-
-    def adjustedposition(self, position):
-        return tuple(np.subtract(position, 1))
+    def available_board_positions(self):
+        available_board_positions_array = np.asarray(np.where((self.positions == self.gametokens[0])))
+        available_board_positions_tuple_list = []
+        for col in range(0, available_board_positions_array.shape[1]):
+            available_board_positions_tuple_list.append(tuple(available_board_positions_array[:, col]))
+        return available_board_positions_tuple_list
 
     def next_turn(self, turn):
-        return (self.TurnNum + 1) % self.numplayers
+        return (turn + 1) % self.total_players
 
-    def makenextplay(self, action):
+    def make_next_play(self, action):
         if self.positions[action] == self.gametokens[0]:
-            self.positions[action] = self.gametokens[self.playernum(self.TurnNum)]
-            self.TurnNum = self.next_turn(self.TurnNum)
-            self.actiontracker.append((len(self.actiontracker), self.gametokens[self.playernum(self.TurnNum)], action))
+            self.positions[action] = self.gametokens[self.player_number(self.current_turn_number)]
+            self.current_turn_number = self.next_turn(self.current_turn_number)
+            self.move_history_dict.append((len(self.move_history_dict), self.gametokens[self.player_number(self.current_turn_number)], action))
         else:
             return False
 
     def copy(self):
-        return self.boardsize, self.numplayers, self.winlinelen, self.humanplayers
-
+        return self.board_width, self.total_players, self.winning_line, self.total_humans
 
     @staticmethod
-    def findsubarray(array, subarray):
+    def find_subarray(array, subarray):
         if array.tostring().find(subarray.tostring()) != -1:
-          return True
+            return True
         else:
-          return False
+            return False
 
     def rowcheck(self, type, i):
-        return self.findsubarray(self.positions[i, :], np.resize(np.array(type), self.winlinelen))
+        return self.find_subarray(self.positions[i, :], np.resize(np.array(type), self.winning_line))
 
     def colcheck(self, type, i):
-        return self.findsubarray(self.positions[:, i], np.resize(np.array(type), self.winlinelen))
+        return self.find_subarray(self.positions[:, i], np.resize(np.array(type), self.winning_line))
 
     def diagcheck(self, type, i):
-        return self.findsubarray(np.diagonal(self.positions, i), np.resize(np.array(type), self.winlinelen))
+        return self.find_subarray(np.diagonal(self.positions, i), np.resize(np.array(type), self.winning_line))
 
     def oppdiagcheck(self, type, i):
-        return self.findsubarray(np.diagonal(np.fliplr(self.positions), i), np.resize(np.array(type), self.winlinelen))
+        return self.find_subarray(np.diagonal(np.fliplr(self.positions), i), np.resize(np.array(type), self.winning_line))
 
-    def endgame(self):
-        for i in range(0, self.boardsize):
-            if self.rowcheck(self.playertoken(self.previousturnnum()), i) or self.colcheck(self.playertoken(self.previousturnnum()), i):
-                return self.playernum(self.previousturnnum())
-        for i in range(-self.boardsize + self.winlinelen, self.boardsize + 1 - self.winlinelen):
-            if self.diagcheck(self.playertoken(self.previousturnnum()), i) or self.oppdiagcheck(self.playertoken(self.previousturnnum()),i):
-                return self.playernum(self.previousturnnum())
-        if len(self.availablepositions()) == 0:
+    def find_winning_player(self):
+        for i in range(0, self.board_width):
+            if self.rowcheck(self.player_token(self.previous_turn()), i) or \
+                    self.colcheck(self.player_token(self.previous_turn()), i):
+                return self.player_number(self.previous_turn())
+        for i in range(-self.board_width + self.winning_line, self.board_width + 1 - self.winning_line):
+            if self.diagcheck(self.player_token(self.previous_turn()), i) or \
+                    self.oppdiagcheck(self.player_token(self.previous_turn()), i):
+                return self.player_number(self.previous_turn())
+        if len(self.available_board_positions()) == 0:
             return 0
         else:
             return -1
 
 
 class Node:
-    def __init__(self, TreeLevel, action=None, parent=None, board=None):
+    def __init__(self, node_depth, action=None, parent=None, board=None):
         self.parent = parent
         self.board = copy.deepcopy(board)
         if action is not None:
-            self.board.makenextplay(action)
+            self.board.make_next_play(action)
         self.children = []
         self.score = 0
         self.visits = 0
-        self.TreeLevel = TreeLevel
-        self.untried_actions = self.board.availablepositions()
+        self.node_depth = node_depth
+        self.untried_actions = self.board.available_board_positions()
         self.action = action
 
     def select(self):
@@ -474,7 +477,7 @@ class Node:
         return s[-1]
 
     def expand(self, action):
-        child = Node(TreeLevel=self.TreeLevel + 1, parent=self, action=action, board=self.board)
+        child = Node(node_depth=self.node_depth + 1, parent=self, action=action, board=self.board)
         self.children.append(child)
         self.untried_actions.remove(action)
         return child
@@ -485,13 +488,11 @@ class Node:
 
 
 def UCTIteration(node, player, lock):
-    start = time.time()
-
     #  expansion - expand parent to a random untried action
     if len(node.untried_actions) > 0:
         #  simulation - rollout to terminal state from current
         #  state using random actions
-        while node.board.endgame() < 0:
+        while node.board.find_winning_player() < 0:
             action = random.choice(node.untried_actions)
             lock.acquire()
             node = node.expand(action)
@@ -499,37 +500,37 @@ def UCTIteration(node, player, lock):
 
     #  back propagation - propagate result of rollout game up the tree
     #  reverse the result if player at the node lost the rollout game
-    if node.board.endgame() >= 0:
-        #  result = node.board.endgame() / node.TreeLevel
+    if node.board.find_winning_player() >= 0:
+        #  result = node.board.find_winning_player() / node.node_depth
         result = 0
-        if node.board.endgame() != 0:
-            if node.board.endgame() == player:
-                result = 1 / node.TreeLevel
+        if node.board.find_winning_player() != 0:
+            if node.board.find_winning_player() == player:
+                result = 1 / node.node_depth
             else:
-                result = -2 / node.TreeLevel
+                result = -1 / node.node_depth
         while node is not None:
             lock.acquire()
             node.update(result)
             lock.release()
-            #  print("Level", node.TreeLevel,"Result", result,node.board.positions)
+            #  print("Level", node.node_depth,"Result", result,node.board.positions)
             node = node.parent
 
 
-def UpdateRootNode(rootstate, player, lock):
+def UpdateRootNode(rootstate, player):
     global root
-    newroot = root[player]
+    new_root_node = root[player]
 
-    while len(newroot.board.actiontracker) < len(rootstate.actiontracker):
-        if newroot.children:
-            child = [child for child in newroot.children if child.action == rootstate.actiontracker[len(newroot.board.actiontracker)][2]]
+    while len(new_root_node.board.move_history_dict) < len(rootstate.move_history_dict):
+        if new_root_node.children:
+            child = [child for child in new_root_node.children if child.action == rootstate.move_history_dict[len(new_root_node.board.move_history_dict)][2]]
             if len(child) > 0:
                 child = child[0]
         else:
-            child = newroot.expand(rootstate.actiontracker[len(newroot.board.actiontracker)][2])
+            child = new_root_node.expand(rootstate.move_history_dict[len(new_root_node.board.move_history_dict)][2])
         if child:
-            newroot = child
+            new_root_node = child
 
-    return newroot
+    return new_root_node
 
 
 def SelectNode(root, player, lock, executor):
@@ -552,219 +553,251 @@ def PickOpponentMove(root):
 
 
 def ResetBoardFunc():
-    global GameResetBoolean
-    GameResetBoolean = True
+    global reset_game
+    reset_game = True
 
 
-def ChangeBoardSizeFunc(newsize):
-    global GameVariablesDict
-    GameVariablesDict["Board Width"]["value"] = newsize
+def ChangeBoardsizeFunc(newsize):
+    global board_parameter_dict
+    board_parameter_dict["Board Width"]["value"] = newsize
 
 
 def ChangeWinningLineFunc(newlength):
-    global GameVariablesDict
-    GameVariablesDict["Winning Line"]["value"] = newlength
+    global board_parameter_dict
+    board_parameter_dict["Winning Line"]["value"] = newlength
 
 
 def ChangePlayerCountFunc(newplayers):
-    global GameVariablesDict
-    GameVariablesDict["Total Players"]["value"] = newplayers
-    if newplayers < GameVariablesDict["Human Players"]["value"]:
+    global board_parameter_dict
+    board_parameter_dict["Total Players"]["value"] = newplayers
+    if newplayers < board_parameter_dict["Human Players"]["value"]:
         ChangeHumanPlayerCountFunc(newplayers)
 
 
-def ChangeHumanPlayerCountFunc(newhumanplayers):
-    global GameVariablesDict
-    GameVariablesDict["Human Players"]["value"] = newhumanplayers
-    if newhumanplayers > GameVariablesDict["Total Players"]["value"]:
-        ChangePlayerCountFunc(newhumanplayers)
+def ChangeHumanPlayerCountFunc(newtotal_humans):
+    global board_parameter_dict
+    board_parameter_dict["Human Players"]["value"] = newtotal_humans
+    if newtotal_humans > board_parameter_dict["Total Players"]["value"]:
+        ChangePlayerCountFunc(newtotal_humans)
 
 
 def ChangeDifficultyFunc(newdifficulty):
-    global GameVariablesDict
-    GameVariablesDict["Difficulty"]["value"] = newdifficulty
+    global board_parameter_dict
+    board_parameter_dict["Difficulty"]["value"] = newdifficulty
 
 
-def CreateButtonsFunc(boardsize):
-    global btns, screensize, board
-    if btns != []:
-        del btns
-    btns = []
-    btn_height = min(screensize[0] * 3 / 4, screensize[1]) / boardsize
-    btn_width = btn_height
-    for row in range(0, boardsize):
-        for col in range(0, boardsize):
-            top = btn_height * row
-            left = btn_width * col
+def CreateButtonsFunc(board_width):
+    global button_list, screen_pixels, board
+    if button_list:
+        del button_list
+    button_list = []
+    button_height = min(screen_pixels[0] * 3 / 4, screen_pixels[1]) / board_width
+    button_width = button_height
+    for row in range(0, board_width):
+        for col in range(0, board_width):
+            top = button_height * row
+            left = button_width * col
             if row+col == 0:
-                b = Button(rect = (left, top, btn_width, btn_height), text = "X", command = lambda l = (row,col): board.makenextplay(l), position = (row,col), **buttonsettings)
-                btns.append(b)
+                b = Button(rect=(left, top, button_width, button_height), text="X", command=lambda l=(row, col)
+                : board.make_next_play(l), position=(row, col), **buttonsettings)
+                button_list.append(b)
                 fontsize = b.fontsize
             else:
-                b = Button(rect=(left, top, btn_width, btn_height), text="X", fontsize = fontsize,
-                         command=lambda l=(row, col): board.makenextplay(l), position=(row, col), **buttonsettings)
-                btns.append(b)
-    b = Button(rect=(screensize[0] * 61/80-80, screensize[1]-130, 300, 100),
+                b = Button(rect=(left, top, button_width, button_height), text="X", fontsize=fontsize,
+                         command=lambda l=(row, col): board.make_next_play(l), position=(row, col), **buttonsettings)
+                button_list.append(b)
+    b = Button(rect=(screen_pixels[0] * 61/80-80, screen_pixels[1]-130, 300, 100),
                command=ResetBoardFunc, text="Restart", **buttonsettings)
-    btns.append(b)
+    button_list.append(b)
 
 
 def CreateSlidersFunc(availablerect, labelsize, sliderrectsize):
-    global slds
-    global GameVariablesDict
-    if slds != {}:
-        slds = {}
+    global slider_list
+    global board_parameter_dict
+    if slider_list != {}:
+        slider_list = {}
 
-    labelposition = np.subtract((int(availablerect[0]+availablerect[2]*1/2),int(availablerect[1]+availablerect[3] * 1 / 20)),[int(0.5*i) for i in labelsize])
-    xlimit = np.add((availablerect[2]*1/10,availablerect[2]*9/10),availablerect[0])
-    ylimit = (labelposition[1] + labelsize[1] + sliderrectsize[1]*1/2 ,)*2
+    labelposition = np.subtract((int(availablerect[0]+availablerect[2]*1/2)
+                                 , int(availablerect[1]+availablerect[3] * 1 / 20)), [int(0.5*i) for i in labelsize])
+    xlimit = np.add((availablerect[2]*1/10, availablerect[2]*9/10), availablerect[0])
+    ylimit = (labelposition[1] + labelsize[1] + sliderrectsize[1]*1/2, )*2
     slidernumber = 0
-    totalsliders = len(GameVariablesDict.keys()) + 1
+    totalsliders = len(board_parameter_dict.keys()) + 1
     increment = int(availablerect[3]/totalsliders)
 
-    for key in GameVariablesDict.keys():
-        s = Slider(rect=(labelposition[0],labelposition[1]+slidernumber*increment+10)+labelsize, sliderrectsize=sliderrectsize,
-                   startingvalue=GameVariablesDict[key]["value"], command=GameVariablesDict[key]["function"], text=key, xlimit=xlimit,
-                   ylimit=np.add(ylimit, slidernumber*increment+10), valuerange=GameVariablesDict[key]["range"], **slidersettings)
-        slds[key] = s
+    for key in board_parameter_dict.keys():
+        s = Slider(rect=(labelposition[0],labelposition[1]+slidernumber*increment+10)+labelsize, 
+                   sliderrectsize=sliderrectsize, startingvalue=board_parameter_dict[key]["value"], 
+                   command=board_parameter_dict[key]["function"], text=key, xlimit=xlimit,
+                   ylimit=np.add(ylimit, slidernumber*increment+10), valuerange=board_parameter_dict[key]["range"], 
+                   **slidersettings)
+        slider_list[key] = s
         slidernumber += 1
 
 
 def CreateDisplayWindowsFunc(sliders):
-    global wndws, screensize
-    wndws = {}
+    global window_list, screen_pixels
+    window_list = {}
     firstsliderbool = True
     for key in sliders.keys():
         rect = sliders[key].rect
         rectposition = rect.topleft
         windowrect = (rectposition[0]+rect.size[0]+30, rectposition[1], 40, rect.size[1])
         if firstsliderbool:
-            window = Button(windowrect, text = str(sliders[key].startingvalue), disabled=True, **buttonsettings)
-            wndws[key] = window
+            window = Button(windowrect, text=str(sliders[key].startingvalue)
+                            , disabled=True, **buttonsettings)
+            window_list[key] = window
             fontsize = window.fontsize
         else:
-            window = Button(windowrect, text=str(sliders[key].startingvalue), fontsize=fontsize, disabled=True, **buttonsettings)
-            wndws[key] = window
+            window = Button(windowrect, text=str(sliders[key].startingvalue)
+                            , fontsize=fontsize, disabled=True, **buttonsettings)
+            window_list[key] = window
 
-    currentturnrect = (screensize[1], 0, screensize[0]-screensize[1], 150)
-    wndws["Current Turn"] = Button(currentturnrect, text="Player 1's turn", disabled=True, **buttonsettings)
+    currentturnrect = (screen_pixels[1], 0, screen_pixels[0]-screen_pixels[1], 150)
+    window_list["Current Turn"] = Button(currentturnrect, text="Player 1's turn", disabled=True, **buttonsettings)
 
 
-def CreateWinScreenFunc(screensize, board):
-    global btns, slds, wndws, EndGameScreenBool
-    btns = []
-    slds = {}
-    wndws = {}
+def CreateWinScreenFunc(screen_pixels, board):
+    global button_list, slider_list, window_list, show_win_screen_bool
+    button_list = []
+    slider_list = {}
+    window_list = {}
 
-    if board.endgame()  ==  0:
+    if board.find_winning_player() == 0:
         victorytext = "Stalemate"
     else:
-        if board.previousturnnum() in board.humanturnnums:
-            victorytext = "Human player "+ str(board.playernum(list(board.humanturnnums).index(board.previousturnnum())))+" wins!"
+        if board.previous_turn() in board.human_turn_list:
+            victorytext = "Human player " \
+                          + str(board.player_number(list(board.human_turn_list).index(board.previous_turn()))) \
+                          + " wins!"
         else:
-            victorytext = "Player "+ str(board.playernum(board.previousturnnum()))+ " wins!"
+            victorytext = "Player " + str(board.player_number(board.previous_turn())) + " wins!"
 
-    window = Button(rect = (0, screensize[1]*3/8, screensize[0], screensize[1]*1/4), text = victorytext, disabled = True, **buttonsettings)
-    wndws["End Game"] = window
-    b = Button(rect = (screensize[0] * 1/2-150, screensize[1]*5/8, 300, 100), command = ResetBoardFunc, text = "Restart",
-               **buttonsettings)
-    btns.append(b)
-    EndGameScreenBool = True
+    window = Button(rect=(0, screen_pixels[1]*3/8, screen_pixels[0], screen_pixels[1]*1/4)
+                    , text=victorytext, disabled=True, **buttonsettings)
+    window_list["End Game"] = window
+    b = Button(rect=(screen_pixels[0] * 1/2-150, screen_pixels[1]*5/8, 300, 100)
+               , command=ResetBoardFunc, text="Restart", **buttonsettings)
+    b.disabled = False
+    button_list.append(b)
+    for button in button_list:
+        button.disabled = False
+    show_win_screen_bool = True
+
+
+def CreateOptionsScreen():
+    global button_list, slider_list, window_list, board_parameter_dict, show_option_screen
+    button_list = []
+    slider_list = {}
+    window_list = {}
+    
+    for i in arange(board_parameter_dict["Total Players"]["value"](1)):
+        slider = Slider
+
+
+def DrawMainScreen(screen_pixels):
+    global button_list, slider_list, window_list
+    global board_parameter_dict
+    CreateSlidersFunc((screen_pixels[1], screen_pixels[1]*1/8, screen_pixels[0]-screen_pixels[1], screen_pixels[1]*8/10),
+                      labelsize=(150, 50), sliderrectsize=(10, 50))
+    CreateButtonsFunc(board_parameter_dict["Board Width"]["value"])
+    CreateDisplayWindowsFunc(slider_list)
 
 
 def GameResetFunc():
     global screen, factor
-    global btns, slds, wndws
-    global GameVariablesDict, GameOver, GameResetBoolean, EndGameScreenBool
-    global board, boardsim, root, turn, iterations, OpponentIterations
+    global button_list, slider_list, window_list
+    global board_parameter_dict, winning_player, reset_game, show_win_screen_bool
+    global board, boardsim, root, turn, iterations, ai_iteration_limit
 
     screen.fill(pg.Color("Black"))
-    factor = board.boardsize / GameVariablesDict["Board Width"]["value"] - 1
+    factor = board.board_width / board_parameter_dict["Board Width"]["value"] - 1
 
-    board = GameBoard(GameVariablesDict)
+    board = GameBoard(board_parameter_dict)
     boardsim = CopyBoard(board)
     root = CreateRootNodes()
-    OpponentIterations = CalculateAIIterations(GameVariablesDict)
+    ai_iteration_limit = CalculateAIIterations(board_parameter_dict)
 
-    CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
+    CreateButtonsFunc(board_parameter_dict["Board Width"]["value"])
     CreateSlidersFunc(
-        (screensize[1], screensize[1] * 1 / 8, screensize[0] - screensize[1], screensize[1] * 9 / 10),
+        (screen_pixels[1], screen_pixels[1] * 1 / 8, screen_pixels[0] - screen_pixels[1], screen_pixels[1] * 9 / 10),
         labelsize=(150, 50), sliderrectsize=(10, 50))
-    CreateDisplayWindowsFunc(slds)
+    CreateDisplayWindowsFunc(slider_list)
 
-    GameResetBoolean = False
-    EndGameScreenBool = False
+    reset_game = False
+    show_win_screen_bool = False
     turn = -1
     iterations = 0
-    GameOver = -1
+    winning_player = -1
 
 
 def ScreenUpdate():
     global screen
-    global screensize, factor
-    global btns, slds, wndws
-    global GameVariablesDict, GameOver
+    global screen_pixels, factor
+    global button_list, slider_list, window_list
+    global board_parameter_dict, winning_player
     global board, turn
 
     screen.fill(pg.Color("Black"))
     mouse = pg.mouse.get_pos()
+
     for event in pg.event.get():
         if event.type == pg.QUIT:
             pg.quit()
             sys.exit(0)
-        if event.type == pg.VIDEORESIZE and screensize != event.size:
-            factor = np.subtract(np.divide(event.size, screensize), 1)
-            screensize = event.size
-            for btn in btns:
-                btn.rect = btn.rect.inflate(btn.rect.size * factor)
-                btn.rect = btn.rect.move(btn.rect.center * factor)
-                btn.resizefont(size=int(btn.fontsize * (1 + np.min(factor))))
-            for sld in slds.values():
-                sld.rect = sld.rect.inflate(sld.rect.size * factor)
-                sld.sliderrect = sld.sliderrect.inflate(sld.sliderrect.size * factor)
-                sld.rect = sld.rect.move(sld.rect.center * factor)
-                sld.sliderrect = sld.sliderrect.move(sld.sliderrect.center * factor)
-                sld.xlimit = sld.xlimit * (1 + factor[0])
-                sld.ylimit = sld.ylimit * (1 + factor[1])
-                sld.createsliderlines()
-                sld.set_notches(sld.sliderrect.size)
-                sld.resizefont(size=int(sld.fontsize * (1 + np.min(factor))))
-            for wndw in wndws.values():
-                wndw.rect = wndw.rect.inflate(wndw.rect.size * factor)
-                wndw.rect = wndw.rect.move(wndw.rect.center * factor)
-                wndw.resizefont(size=int(wndw.fontsize * (1 + 2 * np.min(factor))))
+        if event.type == pg.VIDEORESIZE and screen_pixels != event.size:
+            factor = np.subtract(np.divide(event.size, screen_pixels), 1)
+            screen_pixels = event.size
+            for button in button_list:
+                button.rect = button.rect.inflate(button.rect.size * factor)
+                button.rect = button.rect.move(button.rect.center * factor)
+                button.resizefont(size=int(button.fontsize * (1 + np.min(factor))))
+            for slider in slider_list.values():
+                slider.rect = slider.rect.inflate(slider.rect.size * factor)
+                slider.sliderrect = slider.sliderrect.inflate(slider.sliderrect.size * factor)
+                slider.rect = slider.rect.move(slider.rect.center * factor)
+                slider.sliderrect = slider.sliderrect.move(slider.sliderrect.center * factor)
+                slider.xlimit = slider.xlimit * (1 + factor[0])
+                slider.ylimit = slider.ylimit * (1 + factor[1])
+                slider.createsliderlines()
+                slider.set_notches(slider.sliderrect.size)
+                slider.resizefont(size=int(slider.fontsize * (1 + np.min(factor))))
+            for window in window_list.values():
+                window.rect = window.rect.inflate(window.rect.size * factor)
+                window.rect = window.rect.move(window.rect.center * factor)
+                window.resizefont(size=int(window.fontsize * (1 + 2 * np.min(factor))))
             screencopy = screen.copy()
-            screen = pg.display.set_mode(screensize, pg.RESIZABLE)
+            screen = pg.display.set_mode(screen_pixels, pg.RESIZABLE)
             screen.blit(screencopy, (0, 0))
-        for btn in btns:
-            btn.get_event(event)
-            if btn.position:
-                if board.positions[btn.position] == " " and turn in board.humanturnnums:
-                    btn.parse_text(text=board.positions[btn.position], hover_text=board.playertoken(turn),
-                                   clicked_text=board.playertoken(turn))
-                else:
-                    btn.parse_text(text=board.positions[btn.position], hover_text=board.positions[btn.position],
-                                   clicked_text=board.positions[btn.position])
-            btn.draw(screen)
-        for key in slds.keys():
-            slds[key].get_event(event)
-            if slds[key].clicked:
-                notchvalue = slds[key].findnearestnotch(mouse)
-                slds[key].sliderrect = slds[key].movetonotch(slds[key].sliderrect, notchvalue)
-                wndws[key].parse_text(str(notchvalue))
-            elif slds[key].nearestnotch != GameVariablesDict[key]["value"]:
-                notchvalue = GameVariablesDict[key]["value"]
-                slds[key].sliderrect = slds[key].movetonotch(slds[key].sliderrect, notchvalue)
-                wndws[key].parse_text(str(notchvalue))
-            slds[key].draw(screen)
 
-        for wndw in wndws.values():
-            wndw.draw(screen)
+        for button in button_list:
+            button.get_event(event)
+            if button.position:
+                if board.positions[button.position] == " " and turn in board.human_turn_list:
+                    button.parse_text(text=board.positions[button.position], hover_text=board.player_token(turn),
+                                   clicked_text=board.player_token(turn))
+                else:
+                    button.parse_text(text=board.positions[button.position], hover_text=board.positions[button.position],
+                                   clicked_text=board.positions[button.position])
+            button.draw(screen)
+        for key in slider_list.keys():
+            slider_list[key].get_event(event)
+            if slider_list[key].clicked:
+                notchvalue = slider_list[key].findnearestnotch(mouse)
+                slider_list[key].sliderrect = slider_list[key].movetonotch(slider_list[key].sliderrect, notchvalue)
+                window_list[key].parse_text(str(notchvalue))
+            elif slider_list[key].nearest_notch_value != board_parameter_dict[key]["value"]:
+                notchvalue = board_parameter_dict[key]["value"]
+                slider_list[key].sliderrect = slider_list[key].movetonotch(slider_list[key].sliderrect, notchvalue)
+                window_list[key].parse_text(str(notchvalue))
+            slider_list[key].draw(screen)
+        for window in window_list.values():
+            window.draw(screen)
         pg.display.update()
 
 
-def CalculateAIIterations(GameVariablesDict):
-    return int(GameVariablesDict["Difficulty"]["value"]*(GameVariablesDict["Board Width"]["value"]**2)*5)
+def CalculateAIIterations(board_parameter_dict):
+    return int(board_parameter_dict["Difficulty"]["value"]*(board_parameter_dict["Board Width"]["value"]**2)*5)
 
 
 def CreateRootNodes():
@@ -772,24 +805,24 @@ def CreateRootNodes():
         global root
     except Exception:
         pass
-    rootcopy = Node(board=boardsim, TreeLevel=1)
+    rootcopy = Node(board=boardsim, node_depth=1)
     root = {}
-    for turn in board.AITurnNums:
-        root[board.playernum(turn)] = rootcopy
+    for turn in board.ai_turn_list:
+        root[board.player_number(turn)] = rootcopy
     return root
 
 
 def CopyBoard(board):
-    boardcopy = GameBoard(board.VariablesDict)
+    boardcopy = GameBoard(board.parameters_dict)
     boardcopy.gametokens = board.gametokens
     return boardcopy
 
 
-btns = []
-slds = {}
-wndws = {}
+button_list = []
+slider_list = {}
+window_list = {}
 
-if __name__  ==  '__main__':
+if __name__ == '__main__':
     pg.init()
 
     slidersettings = {
@@ -810,33 +843,31 @@ if __name__  ==  '__main__':
         'font_color': (0, 0, 0),
         'border_color': (0, 0, 0),
     }
-    GameVariablesDict = {
-        "Board Width": {"function": ChangeBoardSizeFunc, "range": (3, 8), "value": 3},
+    board_parameter_dict = {
+        "Board Width": {"function": ChangeBoardsizeFunc, "range": (3, 8), "value": 3},
         "Winning Line": {"function": ChangeWinningLineFunc, "range": (2, 8), "value": 3},
         "Total Players": {"function": ChangePlayerCountFunc, "range": (2, 8), "value": 2},
         "Human Players": {"function": ChangeHumanPlayerCountFunc, "range": (0, 8), "value": 1},
         "Difficulty": {"function": ChangeDifficultyFunc, "range": (1, 10), "value": 5},
     }
 
-    GameClock = pg.time.Clock()
-    GameResetBoolean = False
-    EndGameScreenBool = False
+    clock = pg.time.Clock()
+    reset_game = False
+    show_win_screen_bool = False
+    show_option_screen = False
     turn = -1
-    screensize = (1920, 1080)
+    screen_pixels = (1920, 1080)
 
-    screen = pg.display.set_mode(screensize, pg.RESIZABLE)
+    screen = pg.display.set_mode(screen_pixels, pg.RESIZABLE)
     pg.display.set_caption("Noughts and Crosses")
     screen_rect = screen.get_rect()
     fps_int = 60
     refresh_time = datetime.timedelta(seconds=1)/fps_int
 
-    CreateSlidersFunc((screensize[1], screensize[1]*1/8, screensize[0]-screensize[1], screensize[1]*8/10),
-                      labelsize=(150, 50), sliderrectsize=(10, 50))
-    CreateButtonsFunc(GameVariablesDict["Board Width"]["value"])
-    CreateDisplayWindowsFunc(slds)
+    DrawMainScreen(screen_pixels)
 
-    board = GameBoard(GameVariablesDict)
-    GameOver = board.endgame()
+    board = GameBoard(board_parameter_dict)
+    winning_player = board.find_winning_player()
 
     #  Create a copy of the board for the UCT algorithm to modify
     boardsim = CopyBoard(board)
@@ -844,48 +875,55 @@ if __name__  ==  '__main__':
     #  Create the top level node for all simulations of board states
     root = CreateRootNodes()
 
-    OpponentIterations = CalculateAIIterations(GameVariablesDict)
+    ai_iteration_limit = CalculateAIIterations(board_parameter_dict)
     iterations = 0
     lock = threading.RLock()
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
+        previous_frame_time = datetime.datetime.now()
         while True:
-            executor.submit(ScreenUpdate())
-            GameOver = board.endgame()
-            if GameOver != -1:
-                if not EndGameScreenBool:
-                    CreateWinScreenFunc(screensize, board)
-                    for btn in btns:
-                        btn.disabled = False
+            if datetime.datetime.now() - previous_frame_time > refresh_time:
+                executor.submit(ScreenUpdate())
+                previous_frame_time = datetime.datetime.now()
+
+            if board.find_winning_player() != -1:
+                if not show_win_screen_bool:
+                    CreateWinScreenFunc(screen_pixels, board)
+
             else:
-                if turn != board.TurnNum:
-                    turn = board.TurnNum
-                    if wndws["Current Turn"]:
-                        turntext = "Player " + str(board.playernum(board.TurnNum)) + "'s turn"
-                        wndws["Current Turn"].parse_text(turntext)
-                    for btn in btns:
-                        if turn not in board.humanturnnums:
-                            btn.disabled = True
+                if turn != board.current_turn_number:
+                    turn = board.current_turn_number
+                    if window_list["Current Turn"]:
+                        turntext = "Player " + str(board.player_number(board.current_turn_number)) + "'s turn"
+                        window_list["Current Turn"].parse_text(turntext)
+                    for button in button_list:
+                        if button.position:
+                            if turn in board.human_turn_list:
+                                button.disabled = False
+                            else:
+                                button.disabled = True
+
+                    if board.ai_turn_list:
+                        current_turn = board.current_turn_number
+                        if len(board.ai_turn_list) == 1:
+                            current_turn = board.ai_turn_list[0]
                         else:
-                            btn.disabled = False
+                            while current_turn not in board.ai_turn_list:
+                                current_turn = board.next_turn(current_turn)
+                        player = board.player_number(current_turn)
+                        new_root_node = UpdateRootNode(board, player)
 
-                    current_turn = board.TurnNum
-                    while current_turn not in board.AITurnNums:
-                        current_turn = board.next_turn(current_turn)
-                    player = board.playernum(current_turn)
-                    newroot = UpdateRootNode(board, player, lock)
+                if new_root_node.visits > ai_iteration_limit:
+                    if turn in board.ai_turn_list:
+                        print("Opponent Turn")
+                        Opponent_play = PickOpponentMove(new_root_node)
+                        board.make_next_play(Opponent_play)
+                    else:
+                        player = board.player_number(current_turn)
+                        new_root_node = UpdateRootNode(board, player)
 
-                if newroot.visits > OpponentIterations and turn in board.AITurnNums:
-                    print("Opponent Turn")
-                    Opponent_play = PickOpponentMove(newroot)
-                    board.makenextplay(Opponent_play)
-                    iterations += 1
+                while datetime.datetime.now() - previous_frame_time < refresh_time:
+                    executor.submit(SelectNode(new_root_node, player, lock, executor))
 
-                loop_start_time = datetime.datetime.now()
-                while datetime.datetime.now() - loop_start_time < refresh_time:
-                    executor.submit(SelectNode(newroot, player, lock, executor))
-                    iterations += 1
-
-            if GameResetBoolean:
+            if reset_game:
                 GameResetFunc()
-                
