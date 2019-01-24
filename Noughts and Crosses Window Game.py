@@ -175,9 +175,10 @@ class Button(object):
 
 class Slider(object):
     def __init__(self, rect, sliderrectsize, startingvalue, command, slideroffset=None, text=None, hover_text=None, 
-                 clicked_text=None, xlimit=None, ylimit=None, valuerange=(0, 0), **kwargs):
+                 clicked_text=None, xlimit=None, ylimit=None, valuerange=(0, 0), slider_player=None, **kwargs):
         self.rect = pg.Rect(rect)
         self.command = command
+        self.slider_player = slider_player
         self.startingvalue = startingvalue
         self.nearest_notch_value = startingvalue
         self.valuerange = valuerange
@@ -217,7 +218,7 @@ class Slider(object):
         self.notchlines = {}
         self.notchpoints = {}
         notchnumber = 0
-        for notch in np.arange(self.valuerange[0],self.valuerange[1]+1):
+        for notch in np.arange(self.valuerange[0], self.valuerange[1]+1):
             self.notchpoints[notch] = tuple(self.endpoints[0]+increment*notchnumber)
             self.notchlines[notch] = [(self.endpoints[0]+increment*notchnumber+linewidth),
                                       (self.endpoints[0]+increment*notchnumber-linewidth)]
@@ -262,23 +263,24 @@ class Slider(object):
 
     def process_kwargs(self, kwargs):
         settings = {
-          "colour": pg.Color('white'),
-          "clicked_text_render":None,
-          "hover_text_render":None,
-          "font": pg.font.SysFont(None, 50),
-          "call_on_release": True,
-          "hover_colour": None,
-          "clicked_colour": None,
-          "font_colour": pg.Color('black'),
-          "hover_font_colour": None,
-          "clicked_font_colour": None,
-          "click_sound": None,
-          "hover_sound": None,
-          'border_colour': pg.Color('black'),
-          'border_hover_colour': pg.Color('yellow'),
-          'disabled': False,
-          'disabled_colour': pg.Color('grey'),
-          'radius': 3,
+            "colour": pg.Color('white'),
+            "rect_colour": pg.Color('white'),
+            "clicked_text_render": None,
+            "hover_text_render": None,
+            "font": pg.font.SysFont(None, 50),
+            "call_on_release": True,
+            "hover_colour": None,
+            "clicked_colour": None,
+            "font_colour": pg.Color('black'),
+            "hover_font_colour": None,
+            "clicked_font_colour": None,
+            "click_sound": None,
+            "hover_sound": None,
+            'border_colour': pg.Color('black'),
+            'border_hover_colour': pg.Color('yellow'),
+            'disabled': False,
+            'disabled_colour': pg.Color('grey'),
+            'radius': 3,
         }
         for kwarg in kwargs:
             if kwarg in settings:
@@ -310,7 +312,10 @@ class Slider(object):
         if self.clicked and self.call_on_release:
           #  if user is still within button rect upon mouse release
             if pg.mouse.get_rel():
-                self.command(self.nearest_notch_value)
+                if self.slider_player is None:
+                    self.command(self.nearest_notch_value)
+                else:
+                    self.command(self.nearest_notch_value, self.slider_player)
         self.clicked = False
 
     def check_hover(self):
@@ -340,9 +345,12 @@ class Slider(object):
                 border = self.border_hover_colour
         else:
             colour = self.disabled_colour
-        pg.draw.line(surface, colour, self.endpoints[0],self.endpoints[1])
+
+        self.draw_highlighted_line(surface, self.colour, self.font_colour, self.endpoints[0], self.endpoints[1], self.perpgradient)
         for notch in self.notchlines:
             pg.draw.line(surface, colour, self.notchlines[notch][0], self.notchlines[notch][1])
+            self.draw_highlighted_line(surface, self.colour, self.font_colour, self.notchlines[notch][0], self.notchlines[notch][1],
+                                       self.gradient)
         if self.radius:
             rad = self.radius
         else:
@@ -371,6 +379,18 @@ class Slider(object):
             pg.draw.circle(image, colour, getattr(corners, attribute), rad)
         image.fill(colour, rect.inflate(-2 * rad, 0))
         image.fill(colour, rect.inflate(0, -2 * rad))
+
+    def draw_highlighted_line(self, surface, slider_colour, border_colour, start_point, end_point, gradient):
+        gradient = tuple([2*x for x in list(gradient)])
+        pg.draw.line(surface, border_colour, tuple(np.add(start_point, gradient)),
+                     tuple(np.add(end_point, gradient)))
+        pg.draw.line(surface, border_colour, tuple(np.subtract(start_point, gradient)),
+                     tuple(np.subtract(end_point, gradient)))
+        pg.draw.line(surface, border_colour, tuple(np.add(start_point, gradient)),
+                     tuple(np.subtract(start_point, gradient)))
+        pg.draw.line(surface, border_colour, tuple(np.add(end_point, gradient)),
+                     tuple(np.subtract(end_point, gradient)))
+        pg.draw.line(surface, slider_colour, start_point, end_point)
 
 
 class GameBoard:
@@ -591,6 +611,10 @@ def OpenColourDialog(dict, player):
     red, green, blue = bytes.fromhex(colour[1:])
     colour = (red, green, blue)
     dict[player]["colour"] = colour
+    try:
+        dict[player]["updated"] = False
+    except KeyError:
+        pass
 
 
 def CreateButtonsFunc(board_width):
@@ -622,7 +646,7 @@ def CreateButtonsFunc(board_width):
 
 
 def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, slider_parameter_dict):
-    global slider_list
+    global slider_list, screen_colour_dict
     if slider_list != {}:
         slider_list = {}
 
@@ -636,14 +660,16 @@ def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, slider_parameter
 
     for key in slider_parameter_dict.keys():
         if slider_parameter_dict == player_dict:
-            text = "Player " + str(key)
+            text = "Player " + str(key) + " Difficulty"
+            player = key
         else:
             text = key
+            player = None
         s = Slider(rect=(labelposition[0], labelposition[1]+slidernumber*increment+10)+labelsize,
                    sliderrectsize=sliderrectsize, startingvalue=slider_parameter_dict[key]["value"],
                    command=slider_parameter_dict[key]["function"], text=text, xlimit=xlimit,
                    ylimit=np.add(ylimit, slidernumber*increment+10), valuerange=slider_parameter_dict[key]["range"]
-                   , **slidersettings)
+                   , slider_player=player, **slidersettings)
         slider_list[key] = s
         slidernumber += 1
 
@@ -706,16 +732,26 @@ def CreateOptionsScreen():
     button_list = []
     slider_list = {}
     window_list = {}
-    
-    CreateSlidersFunc((0, 0, screen_pixels[0]*9/10, screen_pixels[1]*9/10)
-                      , labelsize=(150, 50), sliderrectsize=(10, 50), slider_parameter_dict=player_dict)
+
+    CreateSlidersFunc((0, 0, screen_pixels[0]*9/10, screen_pixels[1]*8/10)
+                      , labelsize=(300, 50), sliderrectsize=(10, 50), slider_parameter_dict=player_dict)
     CreateDisplayWindowsFunc(slider_list, False)
+
     player = 1
     for slider in slider_list.values():
         b = Button(rect=(*np.subtract(slider.endpoints[1], (-20, 50)), 300, 100), command=lambda l=(player_dict, player)
                             : OpenColourDialog(*l), text="Change colour", **buttonsettings)
         button_list.append(b)
         player += 1
+    b = Button(rect=(screen_pixels[0] * 39 / 80 - 300, screen_pixels[1] - 500, 300, 100),
+               command=lambda l=(screen_colour_dict, "Board"): OpenColourDialog(*l),
+               text="Board Colour", **buttonsettings)
+    button_list.append(b)
+    b = Button(rect=(screen_pixels[0] * 41 / 80, screen_pixels[1] - 500, 300, 100),
+               command=lambda l=(screen_colour_dict, "Screen"): OpenColourDialog(*l),
+               text="Background Colour", **buttonsettings)
+    button_list.append(b)
+
     b = Button(rect=(screen_pixels[0] * 39 / 80 - 300, screen_pixels[1] - 130, 300, 100),
                command=CreateMainScreen, text="Return to Game", **buttonsettings)
     button_list.append(b)
@@ -725,7 +761,8 @@ def CreateOptionsScreen():
 
 
 def CreateMainScreen():
-    global button_list, slider_list, window_list, board_parameter_dict, screen_pixels
+    global button_list, slider_list, window_list, board_parameter_dict, screen_pixels, screen_colour_dict
+    screen_colour_dict["Screen"]["updated"] = False
     CreateSlidersFunc((screen_pixels[1], screen_pixels[1]*1/8, screen_pixels[0]-screen_pixels[1], screen_pixels[1]*8/10)
                       , labelsize=(150, 50), sliderrectsize=(10, 50), slider_parameter_dict=board_parameter_dict)
     CreateButtonsFunc(board_parameter_dict["Board Width"]["value"])
@@ -738,13 +775,22 @@ def GameResetFunc():
     global board_parameter_dict, player_dict, winning_player, reset_game, show_win_screen_bool
     global board, boardsim, root, turn, iterations, ai_iteration_limit
 
-    screen.fill(pg.Color("Black"))
+    screen.fill(screen_colour_dict["Screen"]["colour"])
     factor = board.board_width / board_parameter_dict["Board Width"]["value"] - 1
 
     board = GameBoard(board_parameter_dict)
-    CreatePlayerDict(board.total_players, board)
     boardsim = CopyBoard(board)
     root = CreateRootNodes()
+
+    oldplayers = len(player_dict.keys())
+    newplayers = board_parameter_dict["Total Players"]["value"]
+    if oldplayers < newplayers:
+        for player in range(oldplayers + 1, newplayers + 1):
+            player_dict[player] = {"token": board.player_token(player-1), "colour": (0, 0, 0), "value": 5,
+                                        "function": ChangeDifficultyFunc, "range": (1, 10)}
+    elif oldplayers > newplayers:
+        for player in range(newplayers + 1, oldplayers + 1):
+            del player_dict[player]
 
     CreateButtonsFunc(board_parameter_dict["Board Width"]["value"])
     CreateSlidersFunc(
@@ -766,7 +812,7 @@ def ScreenUpdate():
     global board_parameter_dict, player_dict, winning_player
     global board, turn
 
-    screen.fill(pg.Color("Black"))
+    screen.fill(screen_colour_dict["Screen"]["colour"])
     mouse = pg.mouse.get_pos()
     for event in pg.event.get():
         if event.type == pg.QUIT:
@@ -800,6 +846,7 @@ def ScreenUpdate():
         for button in button_list:
             button.get_event(event)
             if button.position:
+                button.colour = button.hover_colour = button.clicked_colour = screen_colour_dict["Board"]["colour"]
                 if turn in player_dict.keys():
                     if board.positions[button.position] == " ":
                         button.font_colour = button.hover_font_colour = button.clicked_font_colour \
@@ -814,7 +861,6 @@ def ScreenUpdate():
                 else:
                     button.parse_text(text=board.positions[button.position], hover_text=board.positions[button.position]
                                       , clicked_text=board.positions[button.position])
-
             button.draw(screen)
         for key in slider_list.keys():
             slider_list[key].get_event(event)
@@ -822,10 +868,6 @@ def ScreenUpdate():
                 notchvalue = slider_list[key].findnearestnotch(mouse)
                 slider_list[key].sliderrect = slider_list[key].movetonotch(slider_list[key].sliderrect, notchvalue)
                 window_list[key].parse_text(str(notchvalue))
-            #elif slider_list[key].nearest_notch_value != board_parameter_dict[key]["value"]:
-             #   notchvalue = board_parameter_dict[key]["value"]
-              #  slider_list[key].sliderrect = slider_list[key].movetonotch(slider_list[key].sliderrect, notchvalue)
-               # window_list[key].parse_text(str(notchvalue))
             slider_list[key].draw(screen)
         for window in window_list.values():
             window.draw(screen)
@@ -836,20 +878,6 @@ def CalculateAIIterations(player):
     global board_parameter_dict, player_dict
     return int(player_dict[player]["value"]*(board_parameter_dict["Board Width"]["value"]**2)*5)
 
-
-def CreatePlayerDict(total_players, board):
-    global player_dict
-
-    if player_dict:
-        if total_players == len(player_dict.keys()):
-            pass
-        elif total_players > len(player_dict.keys()):
-            player = len(player_dict.keys())
-    while player < total_players:
-        player_dict[player + 1] = {"token": board.player_token(player), "colour": (0, 0, 0), "value": 5,
-                                   "function": ChangeDifficultyFunc, "range": (1, 10)}
-        player += 1
-    print(player_dict.keys())
 
 def CreateRootNodes():
     try:
@@ -873,6 +901,7 @@ button_list = []
 slider_list = {}
 window_list = {}
 player_dict = {}
+screen_colour_dict = {}
 
 if __name__ == '__main__':
     pg.init()
@@ -886,6 +915,7 @@ if __name__ == '__main__':
         'font': pg.font.Font(None, 30),
         'font_colour': (0, 0, 0),
         'border_colour': (0, 0, 0),
+        'colour': (255, 255, 255),
     }
     buttonsettings = {
         "clicked_font_colour": (0, 0, 0),
@@ -901,6 +931,10 @@ if __name__ == '__main__':
         "Winning Line": {"function": ChangeWinningLineFunc, "range": (2, 8), "value": 3},
         "Total Players": {"function": ChangePlayerCountFunc, "range": (2, 8), "value": 2},
         "Human Players": {"function": ChangeHumanPlayerCountFunc, "range": (0, 8), "value": 1},
+    }
+    screen_colour_dict = {
+        "Screen": {"colour": (0, 0, 0), "updated": False},
+        "Board": {"colour": (255, 255, 255), },
     }
 
     clock = pg.time.Clock()
@@ -921,7 +955,11 @@ if __name__ == '__main__':
     board = GameBoard(board_parameter_dict)
     winning_player = board.find_winning_player()
 
-    CreatePlayerDict(board.total_players, board)
+    player = 0
+    while player < board.total_players:
+        player_dict[player + 1] = {"token": board.player_token(player), "colour": (0, 0, 0), "value": 5,
+                                   "function": ChangeDifficultyFunc, "range": (1, 10)}
+        player += 1
 
     #  Create a copy of the board for the UCT algorithm to modify
     boardsim = CopyBoard(board)
@@ -946,7 +984,6 @@ if __name__ == '__main__':
             else:
                 if turn != board.current_turn_number:
                     turn = board.current_turn_number
-                    print(turn)
                     ai_iteration_limit = CalculateAIIterations(board.player_number(turn))
                     try:
                         if window_list["Current Turn"]:
