@@ -8,7 +8,8 @@ from PyQt5.QtWidgets import QApplication, QColorDialog
 from PyQt5.QtGui import QColor
 import random
 import string
-import time, datetime
+import time
+import datetime
 from math import log, sqrt
 
 
@@ -348,7 +349,6 @@ class Slider(object):
 
         self.draw_highlighted_line(surface, self.colour, self.font_colour, self.endpoints[0], self.endpoints[1], self.perpgradient)
         for notch in self.notchlines:
-            pg.draw.line(surface, colour, self.notchlines[notch][0], self.notchlines[notch][1])
             self.draw_highlighted_line(surface, self.colour, self.font_colour, self.notchlines[notch][0], self.notchlines[notch][1],
                                        self.gradient)
         if self.radius:
@@ -373,31 +373,42 @@ class Slider(object):
             self._render_region(image, zeroed_rect, inside, rad)
         surface.blit(image, rect)
 
-    def _render_region(self, image, rect, colour, rad):
+    @staticmethod
+    def _render_region(image, rect, colour, rad):
         corners = rect.inflate(-2 * rad, -2 * rad)
         for attribute in ("topleft", "topright", "bottomleft", "bottomright"):
             pg.draw.circle(image, colour, getattr(corners, attribute), rad)
         image.fill(colour, rect.inflate(-2 * rad, 0))
         image.fill(colour, rect.inflate(0, -2 * rad))
 
-    def draw_highlighted_line(self, surface, slider_colour, border_colour, start_point, end_point, gradient):
-        gradient = tuple([2*x for x in list(gradient)])
-        pg.draw.line(surface, border_colour, tuple(np.add(start_point, gradient)),
-                     tuple(np.add(end_point, gradient)))
-        pg.draw.line(surface, border_colour, tuple(np.subtract(start_point, gradient)),
-                     tuple(np.subtract(end_point, gradient)))
-        pg.draw.line(surface, border_colour, tuple(np.add(start_point, gradient)),
-                     tuple(np.subtract(start_point, gradient)))
-        pg.draw.line(surface, border_colour, tuple(np.add(end_point, gradient)),
-                     tuple(np.subtract(end_point, gradient)))
-        pg.draw.line(surface, slider_colour, start_point, end_point)
+    @staticmethod
+    def draw_highlighted_line(surface, slider_colour, border_colour, start_point, end_point, perp_gradient):
+        gradient = (perp_gradient[1], -perp_gradient[0])
+        perp_gradient = tuple(np.multiply(perp_gradient, 2))
+
+        positive_offset_point = tuple(np.add(np.negative(gradient), perp_gradient))
+        negative_offset_point = tuple(np.add(np.negative(gradient), np.negative(perp_gradient)))
+        start_positive_offset_point = tuple(np.add(start_point, positive_offset_point))
+        start_negative_offset_point = tuple(np.add(start_point, negative_offset_point))
+        end_positive_offset_point = tuple(np.add(end_point, positive_offset_point))
+        end_negative_offset_point = tuple(np.add(end_point, negative_offset_point))
+
+        left, top = start_negative_offset_point
+        width, height = np.subtract(end_positive_offset_point, start_negative_offset_point)
+        rect = pg.Rect(left, top, width, height)
+        pg.draw.rect(surface, slider_colour, rect)
+
+        pg.draw.line(surface, border_colour, start_positive_offset_point, end_positive_offset_point)
+        pg.draw.line(surface, border_colour, start_negative_offset_point, end_negative_offset_point)
+        pg.draw.line(surface, border_colour, start_positive_offset_point, start_negative_offset_point)
+        pg.draw.line(surface, border_colour, end_positive_offset_point, end_negative_offset_point)
 
 
 class GameBoard:
     def __init__(self, parameters_dict):
         self.parameters_dict = parameters_dict
         self.board_width = parameters_dict["Board Width"]["value"]
-        self.positions = np.full((self.board_width, self.board_width), " ", 'U1')
+        self.positions = np.full((self.board_width, self.board_width), ' ', 'U1')
         self.total_players = parameters_dict["Total Players"]["value"]
         self.winning_line = parameters_dict["Winning Line"]["value"]
         self.total_humans = parameters_dict["Human Players"]["value"]
@@ -508,6 +519,24 @@ class Node:
         self.visits += 1
         self.score += result + 1
 
+    def UpdateRootNode(self, rootstate, player):
+        #global root
+        #new_root_node = root[player]
+        new_root_node = self
+
+        while len(new_root_node.board.move_history_dict) < len(rootstate.move_history_dict):
+            if new_root_node.children:
+                child = [child for child in new_root_node.children if
+                         child.action == rootstate.move_history_dict[len(new_root_node.board.move_history_dict)][2]]
+                if len(child) > 0:
+                    child = child[0]
+            else:
+                child = new_root_node.expand(rootstate.move_history_dict[len(new_root_node.board.move_history_dict)][2])
+            if child:
+                new_root_node = child
+
+        return new_root_node
+
     def UCTIteration(self, node, player, lock):
         #  expansion - expand parent to a random untried action
         if len(node.untried_actions) > 0:
@@ -552,24 +581,6 @@ class Node:
          #   print("Visits", child.visits, "score", child.score, "\n", child.board.positions)
 
         return tuple(s[-1].action)
-
-
-def UpdateRootNode(rootstate, player):
-    global root
-    new_root_node = root[player]
-
-    while len(new_root_node.board.move_history_dict) < len(rootstate.move_history_dict):
-        if new_root_node.children:
-            child = [child for child in new_root_node.children if
-                     child.action == rootstate.move_history_dict[len(new_root_node.board.move_history_dict)][2]]
-            if len(child) > 0:
-                child = child[0]
-        else:
-            child = new_root_node.expand(rootstate.move_history_dict[len(new_root_node.board.move_history_dict)][2])
-        if child:
-            new_root_node = child
-
-    return new_root_node
 
 
 def ResetBoardFunc():
@@ -629,8 +640,8 @@ def CreateButtonsFunc(board_width):
             top = button_height * row
             left = button_width * col
             if row+col == 0:
-                b = Button(rect=(left, top, button_width, button_height), text="X", command=lambda l=(row, col)
-                : board.make_next_play(l), position=(row, col), **buttonsettings)
+                b = Button(rect=(left, top, button_width, button_height), text="X", command=lambda l=(row, col):
+                           board.make_next_play(l), position=(row, col), **buttonsettings)
                 button_list.append(b)
                 fontsize = b.fontsize
             else:
@@ -665,10 +676,10 @@ def CreateSlidersFunc(availablerect, labelsize, sliderrectsize, slider_parameter
         else:
             text = key
             player = None
-        s = Slider(rect=(labelposition[0], labelposition[1]+slidernumber*increment+10)+labelsize,
+        s = Slider(rect=(labelposition[0], labelposition[1]+slidernumber*increment)+labelsize,
                    sliderrectsize=sliderrectsize, startingvalue=slider_parameter_dict[key]["value"],
                    command=slider_parameter_dict[key]["function"], text=text, xlimit=xlimit,
-                   ylimit=np.add(ylimit, slidernumber*increment+10), valuerange=slider_parameter_dict[key]["range"]
+                   ylimit=np.add(ylimit, slidernumber*increment+availablerect[3]*1/100), valuerange=slider_parameter_dict[key]["range"]
                    , slider_player=player, **slidersettings)
         slider_list[key] = s
         slidernumber += 1
@@ -740,22 +751,24 @@ def CreateOptionsScreen():
     player = 1
     for slider in slider_list.values():
         b = Button(rect=(*np.subtract(slider.endpoints[1], (-20, 50)), 300, 100), command=lambda l=(player_dict, player)
-                            : OpenColourDialog(*l), text="Change colour", **buttonsettings)
+                   : OpenColourDialog(*l), text="Change colour", **buttonsettings)
         button_list.append(b)
         player += 1
-    b = Button(rect=(screen_pixels[0] * 39 / 80 - 300, screen_pixels[1] - 500, 300, 100),
+    unchanging_button_y_offset = screen_pixels[1]*8/10
+
+    b = Button(rect=(screen_pixels[0] * 19 / 80 - 300, unchanging_button_y_offset, 300, 80),
                command=lambda l=(screen_colour_dict, "Board"): OpenColourDialog(*l),
                text="Board Colour", **buttonsettings)
     button_list.append(b)
-    b = Button(rect=(screen_pixels[0] * 41 / 80, screen_pixels[1] - 500, 300, 100),
+    b = Button(rect=(screen_pixels[0] * 21 / 80, unchanging_button_y_offset, 300, 80),
                command=lambda l=(screen_colour_dict, "Screen"): OpenColourDialog(*l),
                text="Background Colour", **buttonsettings)
     button_list.append(b)
 
-    b = Button(rect=(screen_pixels[0] * 39 / 80 - 300, screen_pixels[1] - 130, 300, 100),
+    b = Button(rect=(screen_pixels[0] * 59 / 80 - 300, unchanging_button_y_offset, 300, 80),
                command=CreateMainScreen, text="Return to Game", **buttonsettings)
     button_list.append(b)
-    b = Button(rect=(screen_pixels[0] * 41 / 80, screen_pixels[1] - 130, 300, 100),
+    b = Button(rect=(screen_pixels[0] * 61 / 80, unchanging_button_y_offset, 300, 80),
                command=ResetBoardFunc, text="Restart", **buttonsettings)
     button_list.append(b)
 
@@ -764,7 +777,7 @@ def CreateMainScreen():
     global button_list, slider_list, window_list, board_parameter_dict, screen_pixels, screen_colour_dict
     screen_colour_dict["Screen"]["updated"] = False
     CreateSlidersFunc((screen_pixels[1], screen_pixels[1]*1/8, screen_pixels[0]-screen_pixels[1], screen_pixels[1]*8/10)
-                      , labelsize=(150, 50), sliderrectsize=(10, 50), slider_parameter_dict=board_parameter_dict)
+                      , labelsize=(150, 40), sliderrectsize=(10, 50), slider_parameter_dict=board_parameter_dict)
     CreateButtonsFunc(board_parameter_dict["Board Width"]["value"])
     CreateDisplayWindowsFunc(slider_list)
 
@@ -1006,7 +1019,7 @@ if __name__ == '__main__':
                             while current_turn not in board.ai_turn_list:
                                 current_turn = board.next_turn(current_turn)
                         player = board.player_number(current_turn)
-                        new_root_node = UpdateRootNode(board, player)
+                        new_root_node = root[player].UpdateRootNode(board, player)
 
                 if new_root_node.visits > ai_iteration_limit:
                     if turn in board.ai_turn_list:
@@ -1015,7 +1028,7 @@ if __name__ == '__main__':
                         board.make_next_play(Opponent_play)
                     else:
                         player = board.player_number(current_turn)
-                        new_root_node = UpdateRootNode(board, player)
+                        new_root_node = root[player].UpdateRootNode(board, player)
 
                 while datetime.datetime.now() - previous_frame_time < refresh_time:
                     executor.submit(new_root_node.SelectNode(new_root_node, player, lock, executor))
